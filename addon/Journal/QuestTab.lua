@@ -530,7 +530,8 @@ function Journal.OpenQuest(questId, done)
 	if not id or not J.Has(J.HELLO_QUESTS) or not J.Has(J.HELLO_QUEST_LINKS) then return false end
 	J.FindQuest(id, function (q)
 		if not q then done(false) return end
-		pendingOpen = { id = id, heading = q.heading, name = q.name, done = done }
+		-- q.id: the version of the quest the tab lists (one per faction, say).
+		pendingOpen = { id = q.id, heading = q.heading, name = q.name, done = done }
 		local wasShown = Journal.IsTabShown("quests")
 		J.OpenSection("quests")
 		-- Already on the tab, its onShow doesn't run again.
