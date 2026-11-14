@@ -1884,6 +1884,10 @@ namespace Journal::Index
                 continue;
             if (!gm && (!player->SatisfyQuestRace(q, false) || !player->SatisfyQuestClass(q, false)))
                 continue;
+            // One version of a quest (one per faction, say): the one the player is shown.
+            if (uint32 shown = Quests::ShownVersion(player, questId); shown != questId
+                && std::find(inst->quests.begin(), inst->quests.end(), shown) != inst->quests.end())
+                continue;
 
             Giver giver;
             if (auto g = sData.givers.find(questId); g != sData.givers.end())
