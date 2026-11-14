@@ -104,10 +104,12 @@ between alternatives counts once, and breadcrumbs you've gone past and quests yo
 offers drop out of the count. Headings
 your progression stage hasn't opened carry a lock. The journal opens on the zone you're in.
 
-On the right, the heading's quests, chains together in the order they're done ("Part 3"), with
-the same rows as an instance's Quests tab: your status (available, in your log, ready to turn in,
-done, level too low, needs an earlier quest, later progression stage), who gives it and where when
-that's somewhere else, XP and money for your character, and reward items. Click a quest for its
+On the right, the heading's quests, chains together in the order they're done ("Part 3 of 5"),
+with the same rows as an instance's Quests tab: your status (available, in your log, ready to turn
+in, done, level too low, needs an earlier quest, later progression stage), who gives it and where
+when that's somewhere else, XP and money for your character, and reward items. A quest further
+along a chain says where the chain starts: the first quest, who gives it and where (click it for a
+map flag on that giver). Click a quest for its
 objectives and a map flag on its giver; Shift-click links it in chat. The search box finds quests
 by name anywhere, each with the heading it's under. The Filter menu hides done quests, quests you
 can't take now, or headings you've finished.
@@ -542,7 +544,22 @@ end
 ```
 
 `panel` fills the window's content area (about 870 by 530). `Journal.API` is the version of this
-interface (1). `Journal.IsTabShown(key)` tells whether the journal is open on a tab.
+interface (2). `Journal.IsTabShown(key)` tells whether the journal is open on a tab.
+
+From `Journal.API` 2, `Journal.OpenQuest(questId, done)` opens the Quests tab on a quest: its
+heading picked, the quest scrolled to, opened and marked, whatever the filters (one the character
+can't take yet too). The realm is asked where the quest is first, so the answer comes later:
+`done(true)` once it shows, or `done(false)` when the tab doesn't list it (disabled, another
+faction's, unknown), and then nothing is shown. It returns `false` at once, without calling
+`done`, when the realm can't (no Quests tab, or a module older than the addon), and `true` when it
+asked:
+
+```lua
+if (Journal.API or 0) >= 2 and Journal.OpenQuest(questId, function (shown)
+    if not shown then showStartOnMap() end   -- not in the Quests tab
+end) then return end
+showStartOnMap()                             -- the realm can't open quests
+```
 
 ## Commands
 

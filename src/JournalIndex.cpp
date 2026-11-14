@@ -1860,6 +1860,8 @@ namespace Journal::Index
     //   Q,<quest>,<state>,<level>,<min level>,<flags>,<xp>,<money>,<giver kind C/G/I/->,<giver entry>,<name>,<giver>,<where>,
     //     <step of its chain, 0 = the first>,<era state>
     //   R,<quest>,<rewards id*n/...>,<choices id*n/...>
+    //   S,<quest>,<first quest of its chain>,<quests in the chain>,<giver kind C/G/I/->,<first quest's name>,<giver>,<where>
+    //     (a quest that's part of a chain only)
     // flags: 1 daily, 2 weekly, 4 repeatable, 8 group/elite, 16 heroic, 32 raid
     void HandleQuests(Player* player, std::string const& req, std::vector<std::string_view> const& args)
     {
