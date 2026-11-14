@@ -1,4 +1,13 @@
-# Journal
+# Journal 2.9.0
+
+<div align="center">
+
+![Interface Version](https://img.shields.io/badge/Interface-30300-blue)
+![WoW Version](https://img.shields.io/badge/WoW-3.3.5a-orange)
+[![Version](https://img.shields.io/badge/Version-2.9.0-green)](https://github.com/EvilTactician/wow-mod-forever-journal)
+[![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
+
+</div>
 
 An [AzerothCore](https://www.azerothcore.org/) (WotLK 3.3.5a) module and addon that add a
 **retail-style journal** in one window, in the spirit of WoW Forever's, with a tab for each part:
@@ -21,6 +30,11 @@ An [AzerothCore](https://www.azerothcore.org/) (WotLK 3.3.5a) module and addon t
 - Tabs from other addons: [mod-beast-collection](https://github.com/buildthehomelab/wow-mod-beast-collection)'s
   hunter **Beasts** field guide and [mod-transmog-plus](https://github.com/buildthehomelab/wow-mod-transmog-plus)'s
   **Appearances** show up here when they're installed.
+- Optional tabs from separate addons:
+  - **Progression** ([JournalProgression](https://github.com/EvilTactician/JournalProgression)):
+    your mod-individual-progression stage and what it takes to unlock the next.
+  - **Gear** ([JournalGearBIS](https://github.com/EvilTactician/JournalGearBIS)): a best-in-slot
+    gear path for your class and role, aware of your progression stage.
 
 Open it with **Shift-J**, the minimap button, `/journal`, `/quests`, `/directory`, `/lore`, `/mounts`,
 `/pets` or `/toys`. With DragonUI, its Pets & Mounts micro button (and its key binding) opens the
