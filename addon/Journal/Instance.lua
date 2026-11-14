@@ -247,7 +247,7 @@ local function layoutBosses(inst, bosses, variant, st)
 					local wing = inst.wings[boss.wing + 1]
 					w.text:SetText(wing and wing.name or "")
 					w.extra:SetText(wing and (wing.minLevel .. "-" .. wing.maxLevel
-						.. ((wing.targetLevel or 0) > 0 and (", best " .. wing.targetLevel) or "")) or "")
+						.. ((wing.targetLevel or 0) > 0 and (", best ~" .. wing.targetLevel) or "")) or "")
 				end
 				y = y + WING_ROW + 2
 			end
@@ -304,7 +304,7 @@ function page:Refresh()
 	setHeaderArt(inst)
 	header.name:SetText(inst.name)
 	local players = variant.players and variant.players > 0 and (variant.players .. " players") or nil
-	local levels = J.LevelText(inst.minLevel, inst.maxLevel, not inst.raid and inst.targetLevel)
+	local levels = J.LevelText(inst, v.tier)
 	local parts = { levels }
 	if players then table.insert(parts, players) end
 	if inst.zone ~= "" then table.insert(parts, inst.zone) end

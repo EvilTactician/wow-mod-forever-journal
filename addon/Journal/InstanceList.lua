@@ -105,8 +105,7 @@ local function makeTile()
 		if not inst then return end
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		GameTooltip:SetText(inst.name)
-		GameTooltip:AddLine((inst.raid and "Raid" or "Dungeon") .. ", " .. J.LevelText(inst.minLevel, inst.maxLevel,
-			not inst.raid and inst.targetLevel):lower(), 1, 1, 1)
+		GameTooltip:AddLine((inst.raid and "Raid" or "Dungeon") .. ", " .. J.LevelText(inst, J.view.tier):lower(), 1, 1, 1)
 		for _, v in ipairs(J.VariantsFor(inst, J.view.tier)) do
 			local locked = J.IsLocked(v)
 			GameTooltip:AddDoubleLine(v.label, locked and ("Progression stage " .. v.reqState) or (v.players .. " players"),
@@ -185,7 +184,7 @@ function page:Refresh()
 				if ra ~= rb then return ra < rb end
 			end
 			local la, lb = a.targetLevel or a.minLevel, b.targetLevel or b.minLevel
-			if a.raid then la, lb = a.minLevel, b.minLevel end
+			if a.raid then la, lb = J.InstanceLevels(a, tier), J.InstanceLevels(b, tier) end
 			if la ~= lb then return la < lb end
 			return a.name < b.name
 		end)
@@ -201,7 +200,7 @@ function page:Refresh()
 			t:SetPoint("TOPLEFT", scroll.content, "TOPLEFT", col * (tileWidth + GAP), -row * (TILE_HEIGHT + GAP))
 			setTileArt(t, inst)
 			t.name:SetText(inst.name)
-			local levels = J.LevelText(inst.minLevel, inst.maxLevel, not inst.raid and inst.targetLevel)
+			local levels = J.LevelText(inst, tier)
 			local locked = J.InstanceLocked(inst, tier)
 			setShown(t.lock, locked)
 			if locked then

@@ -11,8 +11,9 @@
  *
  * A dungeon's level range and best level come from its bosses' levels on the realm (the Dungeon
  * Finder's ranges are Wrath's, which mod-individual-progression's vanilla creature levels don't
- * match): from 3 below its lowest boss to 3 above its highest, best at 2 below its last boss;
- * each wing's the same way. Raids keep the Dungeon Finder's.
+ * match): from 3 below its lowest normal mode boss to 3 above its highest, best at 2 below its
+ * last boss, or at the level its quests need when that's higher; each wing's the same way. Raids
+ * keep the Dungeon Finder's.
  *
  * Difficulty tabs ("variants") are the map's difficulties, plus mod_forever_journal_variant rows
  * such as mod-individual-progression's 40 player Onyxia and Naxxramas. Each tab is listed under
@@ -70,7 +71,7 @@ namespace Journal::Index
 
         // Bumped when rows the addon keeps under the stamp (instances, bosses, loot) change shape,
         // so it asks for them again.
-        constexpr uint32 DATA_REVISION = 2;
+        constexpr uint32 DATA_REVISION = 3;
 
         // mod-individual-progression states (IndividualProgression.h)
         constexpr uint8 IP_BLACKWING_LAIR = 1;   // passed Molten Core
@@ -688,8 +689,10 @@ namespace Journal::Index
         }
 
         // Rare spawns in the instance, after its encounters.
-        // Dungeons' levels from their bosses: from 3 below the lowest to 3 above the highest (at
-        // most the expansion's top level), best at 2 below the last; each wing's from its own.
+        // Dungeons' levels from their normal mode bosses: from 3 below the lowest to 3 above the
+        // highest (at most the expansion's top level), best at 2 below the last; each wing's from
+        // its own. The last wing's best is also at least the level its quests need (not class,
+        // heroic or repeatable quests, nor ones needing more than the last boss's level).
         void BuildLevels()
         {
             for (Instance& inst : sData.instances)
@@ -698,11 +701,14 @@ namespace Journal::Index
                     continue;
                 uint8 cap = inst.expansion >= 2 ? 80 : inst.expansion == 1 ? 70 : 60;
                 uint8 lowest = 255, highest = 0, best = 255;
+                Wing* last = nullptr;
+                uint8 lastHi = 0;
                 for (std::size_t w = 0; w < inst.wings.size(); ++w)
                 {
                     uint8 lo = 255, hi = 0;
                     for (Boss const& b : inst.bosses)
-                        if (!b.rare && std::size_t(b.wing) == w && !b.creatures.empty())
+                        if (!b.rare && std::size_t(b.wing) == w && !b.creatures.empty()
+                            && (!b.difficulties || (b.difficulties & 1)))
                             if (CreatureTemplate const* t = sObjectMgr->GetCreatureTemplate(b.creatures.front()))
                             {
                                 lo = std::min(lo, t->minlevel);
@@ -714,12 +720,26 @@ namespace Journal::Index
                     wing.minLevel = uint8(std::max(1, lo - 3));
                     wing.maxLevel = uint8(std::min<int>(cap, hi + 3));
                     wing.targetLevel = uint8(std::min<int>(cap, std::max(1, hi - 2)));
+                    if (hi >= lastHi)
+                    {
+                        last = &wing;
+                        lastHi = hi;
+                    }
                     lowest = std::min(lowest, wing.minLevel);
                     highest = std::max(highest, wing.maxLevel);
-                    best = std::min(best, wing.targetLevel);
                 }
                 if (!highest)
                     continue;
+                uint32 questLevel = 0;
+                for (uint32 questId : inst.quests)
+                    if (Quest const* q = sObjectMgr->GetQuestTemplate(questId))
+                        if (q->GetZoneOrSort() >= 0 && q->GetType() != QUEST_TYPE_HEROIC && !q->IsRepeatable()
+                            && !q->IsDailyOrWeekly() && q->GetMinLevel() <= lastHi)
+                            questLevel = std::max(questLevel, q->GetMinLevel());
+                last->targetLevel = uint8(std::min<uint32>(cap, std::max<uint32>(last->targetLevel, questLevel)));
+                for (Wing const& wing : inst.wings)
+                    if (wing.targetLevel)
+                        best = std::min(best, wing.targetLevel);
                 inst.minLevel = lowest;
                 inst.maxLevel = highest;
                 inst.targetLevel = best;
@@ -1560,7 +1580,6 @@ namespace Journal::Index
 
         BuildBosses(extras);
         BuildRares();
-        BuildLevels();
         ReadRewards();
 
         // Abilities and loot for every creature the journal shows, on any tab.
@@ -1614,6 +1633,7 @@ namespace Journal::Index
 
         PlaceEntrances();
         BuildQuests();
+        BuildLevels();
         BuildSearch();
         if (GetConfig().collections)
             Collections::Build();
@@ -1623,6 +1643,9 @@ namespace Journal::Index
         for (Instance const& inst : sData.instances)
         {
             h = Fnv(Fnv(Fnv(h, inst.id), inst.map), inst.name);
+            h = Fnv(Fnv(Fnv(h, inst.minLevel), inst.maxLevel), inst.targetLevel);
+            for (Wing const& w : inst.wings)
+                h = Fnv(Fnv(Fnv(h, w.minLevel), w.maxLevel), w.targetLevel);
             for (Variant const& v : inst.variants)
                 h = Fnv(Fnv(Fnv(Fnv(h, v.id), v.reqState), v.expansion), v.label);
             for (Boss const& b : inst.bosses)

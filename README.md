@@ -86,8 +86,15 @@ The window has a tab along the bottom for each part of the journal. Tabs other a
 ### Dungeons and Raids
 
 **Home**: a tier menu (Classic, Burning Crusade, Wrath of the Lich King) and a tile per instance
-with its Dungeon Finder art. Instances your progression stage hasn't
+with its Dungeon Finder art and levels. Instances your progression stage hasn't
 opened carry a lock and the stage they open at.
+
+A dungeon's levels come from its normal mode bosses on your realm (the Dungeon Finder's are
+Wrath's, which mod-individual-progression's vanilla creature levels don't match): from 3 below
+its lowest boss to 3 above its highest, and an estimated best level ("best ~32") 2 below its last
+boss, or the level its quests need when that's higher. Each wing gets its own, as each is entered
+separately ("best ~32-40" across Scarlet Monastery's). Dungeons are listed by best level; raids by
+the progression stage they need, then in the order they're usually done.
 
 **An instance**: its art, levels and entrance zone over the boss list. Multi-wing dungeons
 (Scarlet Monastery, Dire Maul, Maraudon, Stratholme, Blackrock Depths) are split into their wings;

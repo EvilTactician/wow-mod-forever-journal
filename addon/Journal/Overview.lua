@@ -131,8 +131,9 @@ local function instanceOverview(ctx)
 	local mine = serial
 
 	text(inst.name, GameFontNormalHuge, GOLD, 0, 2)
-	text((inst.raid and "Raid" or "Dungeon") .. " for level " .. inst.minLevel .. "-" .. inst.maxLevel
-		.. (not inst.raid and inst.targetLevel and inst.targetLevel > 0 and (", best at level " .. inst.targetLevel) or ""), GameFontHighlight, GREY)
+	local minLevel, maxLevel, best = J.InstanceLevels(inst, J.view.tier)
+	text((inst.raid and "Raid" or "Dungeon") .. " for level " .. (minLevel == maxLevel and minLevel or (minLevel .. "-" .. maxLevel))
+		.. (best and (", best at level " .. best) or ""), GameFontHighlight, GREY)
 
 	local st = ctx.status and ctx.status.inst == inst.id and ctx.status.value or nil
 
