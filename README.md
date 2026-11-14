@@ -275,13 +275,16 @@ At startup the module builds an index:
   items asks for (one of it), or that a vendor's extended cost asks for: tier 4 to 10 tokens,
   Ahn'Qiraj's and 40 player Naxxramas', the Head of Onyxia. Its classes are those of what it turns
   into;
-- **quests** sorted under the instance's zone, or asking for creatures or quest drops found only
-  there; status per player from the core's own checks, XP including other modules' changes
-  (such as mod-forever-dungeon-xp);
+- **quests** sorted under the instance's zone or under the subzone of the same name outside it
+  (Gnomeregan in Dun Morogh), asking for creatures or quest drops found only there, or handed out
+  only there (by someone inside, or by an item that drops only there); status per player from the
+  core's own checks, XP including other modules' changes (such as mod-forever-dungeon-xp);
 - **every quest** with a giver (`creature_queststarter`, `gameobject_queststarter`, their
   `game_event_*_quest` holiday versions, quest-starting items, spells, SmartAI, Dungeon Finder
   rewards, chain follow-ups) under its `QuestSortID` heading: a zone (subzones go to their zone),
-  a sort (class, profession, holiday), or the giver's zone for quests with neither. Chains follow
+  a sort (class, profession, holiday), or the giver's zone for quests with neither. A quest the
+  dungeon journal lists under an instance is under that instance's heading (unless it's a class,
+  profession or event quest). Chains follow
   `PrevQuestId` and `RewardNextQuest`;
 - **mounts** from the Mounts skill line (`SkillLineAbility.dbc` 777) plus any mount spell an item,
   trainer or quest teaches; **pets** from the Companion Pets skill line (778) plus any companion

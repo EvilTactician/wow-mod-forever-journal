@@ -657,8 +657,15 @@ namespace Journal::Quests
             else if (sort == 0 && e.spot.placed && e.spot.zone)
                 zone = TopZone(e.spot.zone);
 
+            // A quest the dungeon journal lists under an instance is under that instance here too
+            // (Gnomeregan's quests are sorted under its subzone of Dun Morogh), unless it is a
+            // class, profession or event quest.
+            uint32 instanceMap = sort >= 0 ? Index::QuestMap(q->GetQuestId()) : 0;
+
             Heading* h;
-            if (zone)
+            if (instanceMap && !(zone && zone->mapid == instanceMap))
+                h = &InstanceHeading(instanceMap);
+            else if (zone)
                 h = &ZoneHeading(zone);
             else if (sort < 0)
                 h = &SortHeading(uint32(-sort));
@@ -680,8 +687,8 @@ namespace Journal::Quests
         if (Heading* other = sData.byId.count(OTHER) ? &sData.headings[sData.byId[OTHER]] : nullptr)
             other->name = "Miscellaneous";
 
-        // Quests with neither zone nor sort given inside an instance join the instance's own
-        // heading, when its other quests made one.
+        // Quests with neither zone nor sort given inside an instance, and the dungeon journal's
+        // quests of an instance, join the instance's own heading, when its other quests made one.
         for (Heading& h : sData.headings)
         {
             if (h.id < INSTANCE_BASE || h.quests.empty())

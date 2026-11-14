@@ -252,6 +252,9 @@ namespace Journal
         // A boss of the journal, or a creature anything summons (spells, SmartAI, boss scripts,
         // summon groups, scripts): a creature that can be met without a spawn of its own.
         bool IsSummonable(uint32 creatureEntry);
+
+        // The map of the journal instance a quest is listed under, 0 when it isn't.
+        uint32 QuestMap(uint32 questId);
     }
 
     // ---- JournalLoot.cpp: loot tables and drop chances ------------------------------------------
