@@ -132,7 +132,7 @@ local function instanceOverview(ctx)
 
 	text(inst.name, GameFontNormalHuge, GOLD, 0, 2)
 	text((inst.raid and "Raid" or "Dungeon") .. " for level " .. inst.minLevel .. "-" .. inst.maxLevel
-		.. (inst.targetLevel and inst.targetLevel > 0 and (", best around " .. inst.targetLevel) or ""), GameFontHighlight, GREY)
+		.. (not inst.raid and inst.targetLevel and inst.targetLevel > 0 and (", best at level " .. inst.targetLevel) or ""), GameFontHighlight, GREY)
 
 	local st = ctx.status and ctx.status.inst == inst.id and ctx.status.value or nil
 

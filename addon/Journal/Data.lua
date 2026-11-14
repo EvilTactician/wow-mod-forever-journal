@@ -66,7 +66,7 @@ local function buildInstances(rows)
 			table.insert(list, inst)
 		elseif kind == "W" and byId[r[2]] then
 			table.insert(byId[r[2]].wings, { index = r[3], lfgId = r[4], minLevel = r[5], maxLevel = r[6],
-				name = Unescape(tostring(r[7])) })
+				name = Unescape(tostring(r[7])), targetLevel = tonumber(r[8]) })
 		elseif kind == "V" and byId[r[2]] then
 			table.insert(byId[r[2]].variants, { id = r[3], difficulty = r[4], expansion = r[5], players = r[6],
 				minLevel = r[7], reqState = r[8], label = Unescape(tostring(r[9])) })
@@ -106,6 +106,13 @@ end
 J.On("CACHE_RESET", function ()
 	instances, instanceList = nil, nil
 end)
+
+-- "Level 29-37, best 32"
+function J.LevelText(minLevel, maxLevel, best)
+	local text = minLevel == maxLevel and ("Level " .. minLevel) or ("Level " .. minLevel .. "-" .. maxLevel)
+	if best and best > 0 and minLevel ~= maxLevel then text = text .. ", best " .. best end
+	return text
+end
 
 -- The tab of an instance to show for a tier: the one the era has opened, the later one when
 -- several are open (25 player over 10), else the first.

@@ -9,6 +9,11 @@
  * order; an encounter belongs to the first wing whose last encounter (instance_encounters'
  * lastEncounterDungeon) comes at or after it.
  *
+ * A dungeon's level range and best level come from its bosses' levels on the realm (the Dungeon
+ * Finder's ranges are Wrath's, which mod-individual-progression's vanilla creature levels don't
+ * match): from 3 below its lowest boss to 3 above its highest, best at 2 below its last boss;
+ * each wing's the same way. Raids keep the Dungeon Finder's.
+ *
  * Difficulty tabs ("variants") are the map's difficulties, plus mod_forever_journal_variant rows
  * such as mod-individual-progression's 40 player Onyxia and Naxxramas. Each tab is listed under
  * an expansion tier, so 40 player Naxxramas sits with the classic raids and the 10 and 25 player
@@ -111,6 +116,7 @@ namespace Journal::Index
             std::string name;
             uint8 minLevel = 0;
             uint8 maxLevel = 0;
+            uint8 targetLevel = 0;
             uint32 lastBit = 0;
         };
 
@@ -682,6 +688,44 @@ namespace Journal::Index
         }
 
         // Rare spawns in the instance, after its encounters.
+        // Dungeons' levels from their bosses: from 3 below the lowest to 3 above the highest (at
+        // most the expansion's top level), best at 2 below the last; each wing's from its own.
+        void BuildLevels()
+        {
+            for (Instance& inst : sData.instances)
+            {
+                if (inst.kind != KIND_DUNGEON)
+                    continue;
+                uint8 cap = inst.expansion >= 2 ? 80 : inst.expansion == 1 ? 70 : 60;
+                uint8 lowest = 255, highest = 0, best = 255;
+                for (std::size_t w = 0; w < inst.wings.size(); ++w)
+                {
+                    uint8 lo = 255, hi = 0;
+                    for (Boss const& b : inst.bosses)
+                        if (!b.rare && std::size_t(b.wing) == w && !b.creatures.empty())
+                            if (CreatureTemplate const* t = sObjectMgr->GetCreatureTemplate(b.creatures.front()))
+                            {
+                                lo = std::min(lo, t->minlevel);
+                                hi = std::max(hi, t->maxlevel);
+                            }
+                    if (!hi || hi > cap + 3)
+                        continue;
+                    Wing& wing = inst.wings[w];
+                    wing.minLevel = uint8(std::max(1, lo - 3));
+                    wing.maxLevel = uint8(std::min<int>(cap, hi + 3));
+                    wing.targetLevel = uint8(std::min<int>(cap, std::max(1, hi - 2)));
+                    lowest = std::min(lowest, wing.minLevel);
+                    highest = std::max(highest, wing.maxLevel);
+                    best = std::min(best, wing.targetLevel);
+                }
+                if (!highest)
+                    continue;
+                inst.minLevel = lowest;
+                inst.maxLevel = highest;
+                inst.targetLevel = best;
+            }
+        }
+
         void BuildRares()
         {
             if (!GetConfig().rares)
@@ -1516,6 +1560,7 @@ namespace Journal::Index
 
         BuildBosses(extras);
         BuildRares();
+        BuildLevels();
         ReadRewards();
 
         // Abilities and loot for every creature the journal shows, on any tab.
@@ -1623,7 +1668,7 @@ namespace Journal::Index
     //
     // DR:<req>:<instances>, then DD rows:
     //   I,<id>,<map>,<kind 0 dungeon/1 raid>,<expansion>,<min level>,<max level>,<target level>,<lfg id>,<name>,<entrance zone>
-    //   W,<instance>,<wing index>,<lfg id>,<min level>,<max level>,<name>        (instances with wings)
+    //   W,<instance>,<wing index>,<lfg id>,<min level>,<max level>,<name>,<best level>   (instances with wings)
     //   V,<instance>,<variant>,<difficulty>,<expansion>,<players>,<min level>,<era state>,<label>
     void HandleList(Player* player, std::string const& req)
     {
@@ -1637,8 +1682,8 @@ namespace Journal::Index
                 for (std::size_t w = 0; w < inst.wings.size(); ++w)
                 {
                     Wing const& wing = inst.wings[w];
-                    rows.push_back(Acore::StringFormat("W,{},{},{},{},{},{}", inst.id, w, wing.lfgId, wing.minLevel, wing.maxLevel,
-                        Escape(wing.name, 50)));
+                    rows.push_back(Acore::StringFormat("W,{},{},{},{},{},{},{}", inst.id, w, wing.lfgId, wing.minLevel, wing.maxLevel,
+                        Escape(wing.name, 50), wing.targetLevel));
                 }
             for (Variant const& v : inst.variants)
                 rows.push_back(Acore::StringFormat("V,{},{},{},{},{},{},{},{}", inst.id, v.id, v.difficulty, v.expansion,
