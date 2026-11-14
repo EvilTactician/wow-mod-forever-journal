@@ -272,7 +272,7 @@ local function showResults(list, text)
 					b.icon:SetTexCoord(0, 1, 0, 1)
 					b.text:SetText(inst.name)
 					b.text:SetTextColor(1, 0.82, 0)
-					b.sub:SetText((inst.raid and "Raid" or "Dungeon") .. ", level " .. inst.minLevel .. "-" .. inst.maxLevel)
+					b.sub:SetText((inst.raid and "Raid" or "Dungeon") .. ", " .. J.LevelText(inst):lower())
 					b.go = function () J.OpenInstance(inst.id) end
 				elseif r.kind == "B" then
 					b.icon:SetTexture("Interface\\TargetingFrame\\UI-TargetingFrame-Skull")

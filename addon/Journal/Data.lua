@@ -66,7 +66,7 @@ local function buildInstances(rows)
 			table.insert(list, inst)
 		elseif kind == "W" and byId[r[2]] then
 			table.insert(byId[r[2]].wings, { index = r[3], lfgId = r[4], minLevel = r[5], maxLevel = r[6],
-				name = Unescape(tostring(r[7])) })
+				name = Unescape(tostring(r[7])), targetLevel = tonumber(r[8]) })
 		elseif kind == "V" and byId[r[2]] then
 			table.insert(byId[r[2]].variants, { id = r[3], difficulty = r[4], expansion = r[5], players = r[6],
 				minLevel = r[7], reqState = r[8], label = Unescape(tostring(r[9])) })
@@ -106,6 +106,33 @@ end
 J.On("CACHE_RESET", function ()
 	instances, instanceList = nil, nil
 end)
+
+-- An instance's levels on a tier's tab: its own, or for a tab of another expansion (40 player
+-- Onyxia and Naxxramas with the classic raids) that tab's level. The best level is a dungeon's,
+-- "~32-40" across its wings when they differ.
+function J.InstanceLevels(inst, tier)
+	if tier and inst.expansion ~= tier then
+		local level
+		for _, v in ipairs(J.VariantsFor(inst, tier)) do
+			if v.minLevel and v.minLevel > 0 then level = math.min(level or v.minLevel, v.minLevel) end
+		end
+		if level then return level, level, nil end
+	end
+	if inst.raid or not inst.targetLevel or inst.targetLevel == 0 then return inst.minLevel, inst.maxLevel, nil end
+	local lo, hi = inst.targetLevel, inst.targetLevel
+	for _, w in ipairs(inst.wings) do
+		if (w.targetLevel or 0) > 0 then lo, hi = math.min(lo, w.targetLevel), math.max(hi, w.targetLevel) end
+	end
+	return inst.minLevel, inst.maxLevel, lo == hi and ("~" .. lo) or ("~" .. lo .. "-" .. hi)
+end
+
+-- "Level 29-45, best ~32-40"
+function J.LevelText(inst, tier)
+	local minLevel, maxLevel, best = J.InstanceLevels(inst, tier)
+	local text = minLevel == maxLevel and ("Level " .. minLevel) or ("Level " .. minLevel .. "-" .. maxLevel)
+	if best then text = text .. ", best " .. best end
+	return text
+end
 
 -- The tab of an instance to show for a tier: the one the era has opened, the later one when
 -- several are open (25 player over 10), else the first.

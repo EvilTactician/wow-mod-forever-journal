@@ -386,6 +386,10 @@ namespace Journal
         // I:<req>:<quest> -> IR, ID rows (C/Q/R), IE: one quest and the heading it's under.
         void HandleQuest(Player* player, std::string const& req, std::vector<std::string_view> const& args);
 
+        // The version of a quest the player is shown (versions: the same name at the same step of a
+        // chain under the same heading, such as one per faction); the quest itself when it has none.
+        uint32 ShownVersion(Player* player, uint32 questId);
+
         // The Q and R rows of a quest for the player (see Index::HandleQuests for their fields), and
         // its S row when it is part of a chain.
         // The caller has checked the player's race and class.

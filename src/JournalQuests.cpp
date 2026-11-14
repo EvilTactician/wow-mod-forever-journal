@@ -16,6 +16,10 @@
  * A quest that's part of a chain has an S row after its Q/R rows: where the chain starts (see
  * Index::HandleQuests).
  *
+ * Versions of one quest (the same name at the same step of a chain under the same heading: one per
+ * Sparklematic 5200, per faction, per level range) are listed and counted once, as the version the
+ * player is furthest along with.
+ *
  * groups: E Eastern Kingdoms, K Kalimdor, O Outland, N Northrend, D dungeons, R raids,
  * B battlegrounds, C classes, P professions, W world events, X the rest. Headings are a zone's
  * area id, SORT_BASE + a quest sort, INSTANCE_BASE + a map, or 0 for quests with no place at all.
@@ -45,6 +49,7 @@
 #include "Timer.h"
 #include "World.h"
 #include <algorithm>
+#include <map>
 #include <tuple>
 #include <unordered_map>
 #include <unordered_set>
@@ -243,6 +248,7 @@ namespace Journal::Quests
             uint8 step = 0;        // quests before it in its chain
             uint32 first = 0;      // the quest its chain starts with
             uint8 steps = 0;       // quests in its chain's longest line
+            uint32 twin = 0;       // its versions' group (the first one's id), 0 when it has none
             std::string title;     // lower case, for the search
         };
 
@@ -262,6 +268,7 @@ namespace Journal::Quests
         struct Data
         {
             std::unordered_map<uint32, Entry> entries;
+            std::unordered_map<uint32, std::vector<uint32>> twins; // group -> the versions of a quest
             std::vector<Heading> headings;
             std::unordered_map<uint32, std::size_t> byId;
         };
@@ -500,6 +507,22 @@ namespace Journal::Quests
             return player->IsGameMaster() || (player->SatisfyQuestRace(q, false) && player->SatisfyQuestClass(q, false));
         }
 
+        // Which of a quest's versions to show: the one furthest along.
+        uint8 StateRank(QuestState state)
+        {
+            switch (state)
+            {
+                case QSTATE_COMPLETE: return 0;
+                case QSTATE_ACTIVE: return 1;
+                case QSTATE_AVAILABLE: return 2;
+                case QSTATE_DONE: return 3;
+                case QSTATE_PREREQ: return 4;
+                case QSTATE_LOW_LEVEL: return 5;
+                case QSTATE_LOCKED: return 6;
+                default: return 7;
+            }
+        }
+
         // Where the giver is, said only when it isn't the heading itself.
         std::string WhereOf(Entry const& e, Heading const* heading)
         {
@@ -733,6 +756,24 @@ namespace Journal::Quests
             chain[q->GetQuestId()] = { root, step };
             sData.entries[q->GetQuestId()].step = step;
         }
+        // Versions of one quest: the same name at the same step of a chain under one heading.
+        for (Heading const& h : sData.headings)
+        {
+            std::map<std::pair<std::string, uint8>, std::vector<uint32>> byName;
+            for (uint32 questId : h.quests)
+                if (Quest const* q = sObjectMgr->GetQuestTemplate(questId))
+                    byName[{ q->GetTitle(), chain[questId].second }].push_back(questId);
+            for (auto& [key, ids] : byName)
+            {
+                if (ids.size() < 2)
+                    continue;
+                std::sort(ids.begin(), ids.end());
+                for (uint32 questId : ids)
+                    sData.entries[questId].twin = ids.front();
+                sData.twins[ids.front()] = ids;
+            }
+        }
+
         std::unordered_map<uint32, uint8> chainSteps; // first quest -> quests in its longest line
         for (auto const& [questId, c] : chain)
         {
@@ -793,6 +834,29 @@ namespace Journal::Quests
 
         LOG_INFO("server.loading", ">> mod-forever-journal: {} quests under {} headings in {} ms",
             quests.size(), sData.headings.size(), GetMSTimeDiffToNow(start));
+    }
+
+    uint32 ShownVersion(Player* player, uint32 questId)
+    {
+        auto itr = sData.entries.find(questId);
+        if (itr == sData.entries.end() || !itr->second.twin)
+            return questId;
+        uint32 best = 0;
+        uint8 bestRank = 255;
+        for (uint32 id : sData.twins[itr->second.twin])
+        {
+            Quest const* q = sObjectMgr->GetQuestTemplate(id);
+            if (!q || !CanSee(player, q))
+                continue;
+            Entry const& e = sData.entries[id];
+            uint8 rank = StateRank(StateOf(player, q, e.era, e.eraEnd));
+            if (rank < bestRank)
+            {
+                best = id;
+                bestRank = rank;
+            }
+        }
+        return best ? best : questId;
     }
 
     void AppendRows(Player* player, Quest const* q, char giverKind, uint32 giverEntry, std::string_view giver,
@@ -881,15 +945,24 @@ namespace Journal::Quests
             uint32 countable = 0;
             uint32 done = 0;
             std::unordered_map<int32, bool> exclusive; // a group of alternatives counts once
+            std::unordered_map<uint32, bool> versions; // so does a quest with versions
             for (uint32 questId : h.quests)
             {
                 Quest const* q = sObjectMgr->GetQuestTemplate(questId);
                 if (!q || !CanSee(player, q))
                     continue;
-                ++total;
-                if (!Countable(player, q, sData.entries[questId]))
+                Entry const& e = sData.entries[questId];
+                if (!e.twin || ShownVersion(player, questId) == questId)
+                    ++total;
+                if (!Countable(player, q, e))
                     continue;
                 bool rewarded = player->IsQuestRewarded(questId);
+                if (e.twin)
+                {
+                    auto [itr, inserted] = versions.emplace(e.twin, rewarded);
+                    itr->second = itr->second || rewarded;
+                    continue;
+                }
                 if (q->GetExclusiveGroup() > 0)
                 {
                     auto [itr, inserted] = exclusive.emplace(q->GetExclusiveGroup(), rewarded);
@@ -901,6 +974,12 @@ namespace Journal::Quests
                     ++done;
             }
             for (auto const& [group, rewarded] : exclusive)
+            {
+                ++countable;
+                if (rewarded)
+                    ++done;
+            }
+            for (auto const& [group, rewarded] : versions)
             {
                 ++countable;
                 if (rewarded)
@@ -939,7 +1018,7 @@ namespace Journal::Quests
         for (uint32 questId : h.quests)
         {
             Quest const* q = sObjectMgr->GetQuestTemplate(questId);
-            if (!q || !CanSee(player, q))
+            if (!q || !CanSee(player, q) || ShownVersion(player, questId) != questId)
                 continue;
             if (++total > MAX_HEADING_QUESTS)
                 continue;
@@ -970,7 +1049,7 @@ namespace Journal::Quests
                 if (e.title.find(text) == std::string::npos)
                     continue;
                 Quest const* q = sObjectMgr->GetQuestTemplate(questId);
-                if (!q || !CanSee(player, q))
+                if (!q || !CanSee(player, q) || ShownVersion(player, questId) != questId)
                     continue;
                 rows.push_back(Acore::StringFormat("C,{},{}", questId, h.id));
                 AppendEntry(player, q, e, &h, rows);
@@ -990,6 +1069,9 @@ namespace Journal::Quests
             return;
         }
         std::vector<std::string> rows;
+        // Asked for a version that isn't listed: the one that is.
+        if (Quest const* asked = sObjectMgr->GetQuestTemplate(questId); asked && CanSee(player, asked))
+            questId = ShownVersion(player, questId);
         auto itr = sData.entries.find(questId);
         Quest const* q = sObjectMgr->GetQuestTemplate(questId);
         auto heading = itr != sData.entries.end() ? sData.byId.find(itr->second.heading) : sData.byId.end();

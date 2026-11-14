@@ -9,6 +9,12 @@
  * order; an encounter belongs to the first wing whose last encounter (instance_encounters'
  * lastEncounterDungeon) comes at or after it.
  *
+ * A dungeon's level range and best level come from its bosses' levels on the realm (the Dungeon
+ * Finder's ranges are Wrath's, which mod-individual-progression's vanilla creature levels don't
+ * match): from 3 below its lowest normal mode boss to 3 above its highest, best at 2 below its
+ * last boss, or at the level its quests need when that's higher; each wing's the same way. Raids
+ * keep the Dungeon Finder's.
+ *
  * Difficulty tabs ("variants") are the map's difficulties, plus mod_forever_journal_variant rows
  * such as mod-individual-progression's 40 player Onyxia and Naxxramas. Each tab is listed under
  * an expansion tier, so 40 player Naxxramas sits with the classic raids and the 10 and 25 player
@@ -65,7 +71,7 @@ namespace Journal::Index
 
         // Bumped when rows the addon keeps under the stamp (instances, bosses, loot) change shape,
         // so it asks for them again.
-        constexpr uint32 DATA_REVISION = 2;
+        constexpr uint32 DATA_REVISION = 3;
 
         // mod-individual-progression states (IndividualProgression.h)
         constexpr uint8 IP_BLACKWING_LAIR = 1;   // passed Molten Core
@@ -111,6 +117,7 @@ namespace Journal::Index
             std::string name;
             uint8 minLevel = 0;
             uint8 maxLevel = 0;
+            uint8 targetLevel = 0;
             uint32 lastBit = 0;
         };
 
@@ -682,6 +689,63 @@ namespace Journal::Index
         }
 
         // Rare spawns in the instance, after its encounters.
+        // Dungeons' levels from their normal mode bosses: from 3 below the lowest to 3 above the
+        // highest (at most the expansion's top level), best at 2 below the last; each wing's from
+        // its own. The last wing's best is also at least the level its quests need (not class,
+        // heroic or repeatable quests, nor ones needing more than the last boss's level).
+        void BuildLevels()
+        {
+            for (Instance& inst : sData.instances)
+            {
+                if (inst.kind != KIND_DUNGEON)
+                    continue;
+                uint8 cap = inst.expansion >= 2 ? 80 : inst.expansion == 1 ? 70 : 60;
+                uint8 lowest = 255, highest = 0, best = 255;
+                Wing* last = nullptr;
+                uint8 lastHi = 0;
+                for (std::size_t w = 0; w < inst.wings.size(); ++w)
+                {
+                    uint8 lo = 255, hi = 0;
+                    for (Boss const& b : inst.bosses)
+                        if (!b.rare && std::size_t(b.wing) == w && !b.creatures.empty()
+                            && (!b.difficulties || (b.difficulties & 1)))
+                            if (CreatureTemplate const* t = sObjectMgr->GetCreatureTemplate(b.creatures.front()))
+                            {
+                                lo = std::min(lo, t->minlevel);
+                                hi = std::max(hi, t->maxlevel);
+                            }
+                    if (!hi || hi > cap + 3)
+                        continue;
+                    Wing& wing = inst.wings[w];
+                    wing.minLevel = uint8(std::max(1, lo - 3));
+                    wing.maxLevel = uint8(std::min<int>(cap, hi + 3));
+                    wing.targetLevel = uint8(std::min<int>(cap, std::max(1, hi - 2)));
+                    if (hi >= lastHi)
+                    {
+                        last = &wing;
+                        lastHi = hi;
+                    }
+                    lowest = std::min(lowest, wing.minLevel);
+                    highest = std::max(highest, wing.maxLevel);
+                }
+                if (!highest)
+                    continue;
+                uint32 questLevel = 0;
+                for (uint32 questId : inst.quests)
+                    if (Quest const* q = sObjectMgr->GetQuestTemplate(questId))
+                        if (q->GetZoneOrSort() >= 0 && q->GetType() != QUEST_TYPE_HEROIC && !q->IsRepeatable()
+                            && !q->IsDailyOrWeekly() && q->GetMinLevel() <= lastHi)
+                            questLevel = std::max(questLevel, q->GetMinLevel());
+                last->targetLevel = uint8(std::min<uint32>(cap, std::max<uint32>(last->targetLevel, questLevel)));
+                for (Wing const& wing : inst.wings)
+                    if (wing.targetLevel)
+                        best = std::min(best, wing.targetLevel);
+                inst.minLevel = lowest;
+                inst.maxLevel = highest;
+                inst.targetLevel = best;
+            }
+        }
+
         void BuildRares()
         {
             if (!GetConfig().rares)
@@ -1569,6 +1633,7 @@ namespace Journal::Index
 
         PlaceEntrances();
         BuildQuests();
+        BuildLevels();
         BuildSearch();
         if (GetConfig().collections)
             Collections::Build();
@@ -1578,6 +1643,9 @@ namespace Journal::Index
         for (Instance const& inst : sData.instances)
         {
             h = Fnv(Fnv(Fnv(h, inst.id), inst.map), inst.name);
+            h = Fnv(Fnv(Fnv(h, inst.minLevel), inst.maxLevel), inst.targetLevel);
+            for (Wing const& w : inst.wings)
+                h = Fnv(Fnv(Fnv(h, w.minLevel), w.maxLevel), w.targetLevel);
             for (Variant const& v : inst.variants)
                 h = Fnv(Fnv(Fnv(Fnv(h, v.id), v.reqState), v.expansion), v.label);
             for (Boss const& b : inst.bosses)
@@ -1623,7 +1691,7 @@ namespace Journal::Index
     //
     // DR:<req>:<instances>, then DD rows:
     //   I,<id>,<map>,<kind 0 dungeon/1 raid>,<expansion>,<min level>,<max level>,<target level>,<lfg id>,<name>,<entrance zone>
-    //   W,<instance>,<wing index>,<lfg id>,<min level>,<max level>,<name>        (instances with wings)
+    //   W,<instance>,<wing index>,<lfg id>,<min level>,<max level>,<name>,<best level>   (instances with wings)
     //   V,<instance>,<variant>,<difficulty>,<expansion>,<players>,<min level>,<era state>,<label>
     void HandleList(Player* player, std::string const& req)
     {
@@ -1637,8 +1705,8 @@ namespace Journal::Index
                 for (std::size_t w = 0; w < inst.wings.size(); ++w)
                 {
                     Wing const& wing = inst.wings[w];
-                    rows.push_back(Acore::StringFormat("W,{},{},{},{},{},{}", inst.id, w, wing.lfgId, wing.minLevel, wing.maxLevel,
-                        Escape(wing.name, 50)));
+                    rows.push_back(Acore::StringFormat("W,{},{},{},{},{},{},{}", inst.id, w, wing.lfgId, wing.minLevel, wing.maxLevel,
+                        Escape(wing.name, 50), wing.targetLevel));
                 }
             for (Variant const& v : inst.variants)
                 rows.push_back(Acore::StringFormat("V,{},{},{},{},{},{},{},{}", inst.id, v.id, v.difficulty, v.expansion,
@@ -1883,6 +1951,10 @@ namespace Journal::Index
             if (!q)
                 continue;
             if (!gm && (!player->SatisfyQuestRace(q, false) || !player->SatisfyQuestClass(q, false)))
+                continue;
+            // One version of a quest (one per faction, say): the one the player is shown.
+            if (uint32 shown = Quests::ShownVersion(player, questId); shown != questId
+                && std::find(inst->quests.begin(), inst->quests.end(), shown) != inst->quests.end())
                 continue;
 
             Giver giver;

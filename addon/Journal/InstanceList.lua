@@ -1,9 +1,21 @@
 -- The Dungeons and Raids tabs' home page, as retail's: a tier menu and a tile per instance with
--- its Dungeon Finder art, name and level range. Instances the character's era
--- hasn't opened (mod-individual-progression) carry a lock.
+-- its Dungeon Finder art, name, level range and best level. Instances the character's era
+-- hasn't opened (mod-individual-progression) carry a lock. Dungeons go by best level, raids by
+-- progression stage, then in the order they're usually done.
 
 local J = Journal
 local setShown = J.SetShown
+
+-- Raids in the order they're usually done (map ids), after their progression stage.
+local RAID_ORDER = {
+	409, 249, 309, 469, 509, 531, 533,          -- Molten Core, Onyxia, Zul'Gurub, Blackwing Lair, Ahn'Qiraj, Naxxramas
+	532, 565, 544, 568, 548, 550, 534, 564, 580, -- Karazhan, Gruul, Magtheridon, Zul'Aman, Serpentshrine, Tempest Keep,
+	                                             -- Hyjal, Black Temple, Sunwell
+	615, 616, 624, 603, 649, 631, 724,          -- Obsidian Sanctum, Eye of Eternity, Archavon, Ulduar, Crusader,
+	                                             -- Icecrown Citadel, Ruby Sanctum
+}
+local raidRank = {}
+for i, map in ipairs(RAID_ORDER) do raidRank[map] = raidRank[map] or i end
 
 local COLUMNS = 4
 local TILE_HEIGHT = 104
@@ -93,7 +105,7 @@ local function makeTile()
 		if not inst then return end
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		GameTooltip:SetText(inst.name)
-		GameTooltip:AddLine((inst.raid and "Raid" or "Dungeon") .. ", level " .. inst.minLevel .. "-" .. inst.maxLevel, 1, 1, 1)
+		GameTooltip:AddLine((inst.raid and "Raid" or "Dungeon") .. ", " .. J.LevelText(inst, J.view.tier):lower(), 1, 1, 1)
 		for _, v in ipairs(J.VariantsFor(inst, J.view.tier)) do
 			local locked = J.IsLocked(v)
 			GameTooltip:AddDoubleLine(v.label, locked and ("Progression stage " .. v.reqState) or (v.players .. " players"),
@@ -159,9 +171,20 @@ function page:Refresh()
 		for _, inst in ipairs(list) do
 			if inst.tiers[tier] and inst.raid == (v.raids and true or false) then table.insert(shown, inst) end
 		end
+		local stage = {}
+		for _, inst in ipairs(shown) do
+			local need = 99
+			for _, var in ipairs(J.VariantsFor(inst, tier)) do need = math.min(need, var.reqState or 0) end
+			stage[inst] = J.Has(J.HELLO_PROGRESSION) and need or 0
+		end
 		table.sort(shown, function (a, b)
+			if a.raid then
+				if stage[a] ~= stage[b] then return stage[a] < stage[b] end
+				local ra, rb = raidRank[a.map] or 99, raidRank[b.map] or 99
+				if ra ~= rb then return ra < rb end
+			end
 			local la, lb = a.targetLevel or a.minLevel, b.targetLevel or b.minLevel
-			if a.raid then la, lb = a.minLevel, b.minLevel end
+			if a.raid then la, lb = J.InstanceLevels(a, tier), J.InstanceLevels(b, tier) end
 			if la ~= lb then return la < lb end
 			return a.name < b.name
 		end)
@@ -177,8 +200,7 @@ function page:Refresh()
 			t:SetPoint("TOPLEFT", scroll.content, "TOPLEFT", col * (tileWidth + GAP), -row * (TILE_HEIGHT + GAP))
 			setTileArt(t, inst)
 			t.name:SetText(inst.name)
-			local levels = inst.minLevel == inst.maxLevel and ("Level " .. inst.minLevel)
-				or ("Level " .. inst.minLevel .. "-" .. inst.maxLevel)
+			local levels = J.LevelText(inst, tier)
 			local locked = J.InstanceLocked(inst, tier)
 			setShown(t.lock, locked)
 			if locked then
