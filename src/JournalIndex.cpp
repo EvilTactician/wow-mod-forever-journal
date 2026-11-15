@@ -12,8 +12,9 @@
  * A dungeon's level range and best level come from its bosses' levels on the realm (the Dungeon
  * Finder's ranges are Wrath's, which mod-individual-progression's vanilla creature levels don't
  * match): from 3 below its lowest normal mode boss to 3 above its highest, best at 2 below its
- * last boss, or at the level its quests need when that's higher; each wing's the same way. Raids
- * keep the Dungeon Finder's.
+ * last boss, or at the level its quests need when that's higher; each wing's the same way. A raid
+ * is for one level, the lowest the Dungeon Finder allows in (60, 70 or 80: its range runs to 83).
+ * No level goes past 80.
  *
  * Difficulty tabs ("variants") are the map's difficulties, plus mod_forever_journal_variant rows
  * such as mod-individual-progression's 40 player Onyxia and Naxxramas. Each tab is listed under
@@ -697,8 +698,15 @@ namespace Journal::Index
         {
             for (Instance& inst : sData.instances)
             {
+                for (Variant& v : inst.variants)
+                    v.minLevel = std::min<uint8>(v.minLevel, 80);
                 if (inst.kind != KIND_DUNGEON)
+                {
+                    inst.minLevel = inst.maxLevel = inst.targetLevel = std::min<uint8>(inst.minLevel, 80);
+                    for (Wing& wing : inst.wings)
+                        wing.minLevel = wing.maxLevel = inst.minLevel;
                     continue;
+                }
                 uint8 cap = inst.expansion >= 2 ? 80 : inst.expansion == 1 ? 70 : 60;
                 uint8 lowest = 255, highest = 0, best = 255;
                 Wing* last = nullptr;
@@ -729,7 +737,12 @@ namespace Journal::Index
                     highest = std::max(highest, wing.maxLevel);
                 }
                 if (!highest)
+                {
+                    inst.minLevel = std::min<uint8>(inst.minLevel, 80);
+                    inst.maxLevel = std::min<uint8>(inst.maxLevel, 80);
+                    inst.targetLevel = std::min<uint8>(inst.targetLevel, 80);
                     continue;
+                }
                 uint32 questLevel = 0;
                 for (uint32 questId : inst.quests)
                     if (Quest const* q = sObjectMgr->GetQuestTemplate(questId))

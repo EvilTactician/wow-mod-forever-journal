@@ -140,7 +140,7 @@ local function instanceOverview(ctx)
 	heading("Difficulties")
 	for _, v in ipairs(J.VariantsFor(inst, J.view.tier)) do
 		local line = "|cffffd200" .. v.label .. "|r  " .. (v.players or 0) .. " players"
-		if v.minLevel and v.minLevel > 0 then line = line .. ", level " .. v.minLevel .. "+" end
+		if v.minLevel and v.minLevel > 0 then line = line .. ", enter from level " .. v.minLevel end
 		local vs = st and st.variants[v.id]
 		if J.IsLocked(v) then
 			line = line .. "  |cffff5555locked: progression stage " .. v.reqState .. " (you: " .. (J.state or 0) .. ")|r"
@@ -195,7 +195,8 @@ local function instanceOverview(ctx)
 	if #inst.wings > 0 then
 		heading("Wings")
 		for _, w in ipairs(inst.wings) do
-			text("|cffffd200" .. w.name .. "|r  level " .. w.minLevel .. "-" .. w.maxLevel, GameFontHighlight, nil, 6, 4)
+			text("|cffffd200" .. w.name .. "|r  level " .. (w.minLevel == w.maxLevel and w.minLevel or (w.minLevel .. "-" .. w.maxLevel))
+				.. ((w.targetLevel or 0) > 0 and (", best ~" .. w.targetLevel) or ""), GameFontHighlight, nil, 6, 4)
 		end
 	end
 

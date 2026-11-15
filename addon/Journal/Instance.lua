@@ -246,7 +246,7 @@ local function layoutBosses(inst, bosses, variant, st)
 				else
 					local wing = inst.wings[boss.wing + 1]
 					w.text:SetText(wing and wing.name or "")
-					w.extra:SetText(wing and (wing.minLevel .. "-" .. wing.maxLevel
+					w.extra:SetText(wing and ((wing.minLevel == wing.maxLevel and wing.minLevel or (wing.minLevel .. "-" .. wing.maxLevel))
 						.. ((wing.targetLevel or 0) > 0 and (", best ~" .. wing.targetLevel) or "")) or "")
 				end
 				y = y + WING_ROW + 2

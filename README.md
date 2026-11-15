@@ -93,7 +93,8 @@ A dungeon's levels come from its normal mode bosses on your realm (the Dungeon F
 Wrath's, which mod-individual-progression's vanilla creature levels don't match): from 3 below
 its lowest boss to 3 above its highest, and an estimated best level ("best ~32") 2 below its last
 boss, or the level its quests need when that's higher. Each wing gets its own, as each is entered
-separately ("best ~32-40" across Scarlet Monastery's). Dungeons are listed by best level; raids by
+separately ("best ~32-40" across Scarlet Monastery's). A raid is for one level: 60, 70 or 80 (the
+Dungeon Finder's ranges run to 83); no level goes past 80. Dungeons are listed by best level; raids by
 the progression stage they need, then in the order they're usually done.
 
 **An instance**: its art, levels and group size over the boss list (the entrance zone is on its Overview). Multi-wing dungeons
