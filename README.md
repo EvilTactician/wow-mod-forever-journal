@@ -96,7 +96,7 @@ boss, or the level its quests need when that's higher. Each wing gets its own, a
 separately ("best ~32-40" across Scarlet Monastery's). Dungeons are listed by best level; raids by
 the progression stage they need, then in the order they're usually done.
 
-**An instance**: its art, levels and entrance zone over the boss list. Multi-wing dungeons
+**An instance**: its art, levels and group size over the boss list (the entrance zone is on its Overview). Multi-wing dungeons
 (Scarlet Monastery, Dire Maul, Maraudon, Stratholme, Blackrock Depths) are split into their wings;
 rares come last. On the right, the difficulty menu and four tabs:
 - **Overview**: with no boss picked, the instance's difficulties with your lockout on each, what

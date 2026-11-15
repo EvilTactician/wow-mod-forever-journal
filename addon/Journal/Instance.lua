@@ -307,7 +307,6 @@ function page:Refresh()
 	local levels = J.LevelText(inst, v.tier)
 	local parts = { levels }
 	if players then table.insert(parts, players) end
-	if inst.zone ~= "" then table.insert(parts, inst.zone) end
 	header.sub:SetText(table.concat(parts, "  -  "))
 	local locked = J.IsLocked(variant)
 	setShown(header.lock, locked)

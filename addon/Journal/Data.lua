@@ -108,15 +108,12 @@ J.On("CACHE_RESET", function ()
 end)
 
 -- An instance's levels on a tier's tab: its own, or for a tab of another expansion (40 player
--- Onyxia and Naxxramas with the classic raids) that tab's level. The best level is a dungeon's,
--- "~32-40" across its wings when they differ.
+-- Onyxia and Naxxramas with the classic raids) that expansion's top level, as its raids have. The
+-- best level is a dungeon's, "~32-40" across its wings when they differ.
+local TOP_LEVEL = { [0] = 60, [1] = 70, [2] = 80 }
 function J.InstanceLevels(inst, tier)
-	if tier and inst.expansion ~= tier then
-		local level
-		for _, v in ipairs(J.VariantsFor(inst, tier)) do
-			if v.minLevel and v.minLevel > 0 then level = math.min(level or v.minLevel, v.minLevel) end
-		end
-		if level then return level, level, nil end
+	if tier and inst.expansion ~= tier and TOP_LEVEL[tier] then
+		return TOP_LEVEL[tier], TOP_LEVEL[tier], nil
 	end
 	if inst.raid or not inst.targetLevel or inst.targetLevel == 0 then return inst.minLevel, inst.maxLevel, nil end
 	local lo, hi = inst.targetLevel, inst.targetLevel
