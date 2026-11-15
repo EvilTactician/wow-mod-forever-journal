@@ -1,10 +1,10 @@
-# Journal 2.9.0
+# Journal 2.10.0
 
 <div align="center">
 
 ![Interface Version](https://img.shields.io/badge/Interface-30300-blue)
 ![WoW Version](https://img.shields.io/badge/WoW-3.3.5a-orange)
-[![Version](https://img.shields.io/badge/Version-2.9.0-green)](https://github.com/EvilTactician/wow-mod-forever-journal)
+[![Version](https://img.shields.io/badge/Version-2.10.0-green)](https://github.com/EvilTactician/wow-mod-forever-journal)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
 </div>

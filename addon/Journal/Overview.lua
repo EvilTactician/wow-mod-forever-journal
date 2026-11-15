@@ -137,10 +137,10 @@ local function instanceOverview(ctx)
 
 	local st = ctx.status and ctx.status.inst == inst.id and ctx.status.value or nil
 
-	heading("Difficulties")
+	-- The tab's name says its size ("20 Player"); the level it lets you in at is under "To enter".
+	heading("Difficulty")
 	for _, v in ipairs(J.VariantsFor(inst, J.view.tier)) do
-		local line = "|cffffd200" .. v.label .. "|r  " .. (v.players or 0) .. " players"
-		if v.minLevel and v.minLevel > 0 then line = line .. ", enter from level " .. v.minLevel end
+		local line = v.label
 		local vs = st and st.variants[v.id]
 		if J.IsLocked(v) then
 			line = line .. "  |cffff5555locked: progression stage " .. v.reqState .. " (you: " .. (J.state or 0) .. ")|r"
@@ -161,7 +161,7 @@ local function instanceOverview(ctx)
 
 	local reqs = st and st.requirements[variant.id]
 	if reqs and #reqs > 0 then
-		heading("To enter (" .. variant.label .. ")")
+		heading("To enter")
 		for _, r in ipairs(reqs) do
 			if r.kind == "L" then
 				check(r.have, "Level " .. r.id)

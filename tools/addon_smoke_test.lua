@@ -692,7 +692,7 @@ step("open Deadmines: bosses, rares, overview, lockout and requirements", functi
 	assert(J.view.page == "instance" and J.view.tier == 0, "didn't move to the instance under its tier")
 	assert(textShown("^Edwin VanCleef$") and textShown("^Mr. Smite$"), "boss rows missing")
 	assert(textShown("^Rares$") and textShown("^Miner Johnson$"), "rares section missing")
-	assert(textShown("Difficulties"), "instance overview missing")
+	assert(textShown("Difficulty"), "instance overview missing")
 	assert(textShown("saved, 1/2 defeated"), "lockout not shown: bit 6 is VanCleef")
 	assert(textShown("Carry Unsent Letter"), "requirement missing")
 	assert(textShown("1 to pick up"), "quest summary missing")

@@ -1788,14 +1788,6 @@ namespace Journal::Index
                 }
             rows.push_back(Acore::StringFormat("V,{},{},{},{},{},{}", v.id, locked ? 1 : 0, v.reqState, saved, resetIn, killed));
 
-            // A tab of another expansion (40 player Onyxia) isn't the map's own difficulty: the
-            // core's requirements are the other one's, so only its own level counts.
-            if (v.expansion != inst->expansion)
-            {
-                if (v.minLevel)
-                    rows.push_back(Acore::StringFormat("R,{},L,{},{},-", v.id, v.minLevel, player->GetLevel() >= v.minLevel ? 1 : 0));
-                continue;
-            }
             DungeonProgressionRequirements const* access = sObjectMgr->GetAccessRequirement(inst->map, Difficulty(v.difficulty));
             if (!access)
                 continue;
