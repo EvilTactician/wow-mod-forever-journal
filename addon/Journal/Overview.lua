@@ -70,13 +70,15 @@ local function heading(str)
 end
 
 -- A line with a ready-check tick or cross in front.
-local function check(ok, str)
+-- optional: a shortcut not done yet reads grey, not red.
+local function check(ok, str, optional)
 	local icon = icons:Get()
-	icon:SetTexture(ok and "Interface\\RaidFrame\\ReadyCheck-Ready" or "Interface\\RaidFrame\\ReadyCheck-NotReady")
+	icon:SetTexture(ok and "Interface\\RaidFrame\\ReadyCheck-Ready"
+		or optional and "Interface\\RaidFrame\\ReadyCheck-Waiting" or "Interface\\RaidFrame\\ReadyCheck-NotReady")
 	icon:SetSize(14, 14)
 	icon:ClearAllPoints()
 	icon:SetPoint("TOPLEFT", c, "TOPLEFT", 6, -y + 1)
-	text(str, GameFontHighlight, ok and nil or RED, 22, 4)
+	text(str, GameFontHighlight, ok and nil or optional and GREY or RED, 22, 4)
 end
 
 local function button(label, onClick, x)
@@ -87,6 +89,76 @@ local function button(label, onClick, x)
 	b:SetPoint("TOPLEFT", c, "TOPLEFT", 4 + (x or 0), -y)
 	b:SetScript("OnClick", onClick)
 	return b
+end
+
+-- One line of "To enter": what it is, then where to get it and buttons that take you there.
+local function requirement(r)
+	local what
+	if r.kind == "L" then what = "Level " .. r.id
+	elseif r.kind == "I" then what = "Carry " .. (GetItemInfo(r.id) or r.name)
+	elseif r.kind == "Q" then what = "Complete the quest " .. r.name
+	elseif r.kind == "A" then what = "Achievement: " .. r.name end
+	if not what then return end
+	if r.optional then
+		what = "Optional shortcut: " .. what:sub(1, 1):lower() .. what:sub(2) .. (r.note ~= "" and (" - " .. r.note) or "")
+	end
+	check(r.have, what, r.optional)
+
+	local line
+	local actions = {}
+	local function questActions(questId, ofThisInstance)
+		table.insert(actions, { "Show quest", function ()
+			if ofThisInstance then J.Show({ tab = "quests" }) else Journal.OpenQuest(questId) end
+		end })
+		if J.Has(J.HELLO_MAP_PINS) then
+			table.insert(actions, { "Show on map", function () J.ShowOnMap("Q", questId) end })
+		end
+	end
+	local function at(where) return where ~= "" and (", " .. where) or "" end
+	if r.source == "G" then
+		line = "Given by " .. r.sourceName .. at(r.where)
+		questActions(r.sourceId, r.inst == 1)
+	elseif r.source == "Q" then
+		line = "Reward from the quest " .. r.sourceName .. (r.where ~= "" and (" (" .. r.where .. ")") or "")
+		questActions(r.sourceId, r.inst == 1)
+	elseif r.source == "D" then
+		line = "Drops from " .. r.sourceName .. at(r.where)
+		if r.inst > 0 and r.boss > 0 then
+			table.insert(actions, { "Show boss", function ()
+				J.Show({ page = "instance", instance = r.inst, boss = r.boss, tab = "loot" })
+			end })
+		elseif J.Has(J.HELLO_MAP_PINS) then
+			table.insert(actions, { "Show on map", function () J.ShowOnMap("C", r.sourceId) end })
+		end
+	elseif r.source == "V" then
+		line = "Sold by " .. r.sourceName .. at(r.where) .. (r.text ~= "" and (", needs " .. r.text) or "")
+		if J.Has(J.HELLO_MAP_PINS) then
+			table.insert(actions, { "Show on map", function () J.ShowOnMap("C", r.sourceId) end })
+		end
+	elseif r.source == "B" then
+		line = "Defeat " .. r.sourceName .. " first"
+		table.insert(actions, { "Show boss", function ()
+			J.Show({ page = "instance", instance = r.inst, boss = r.boss, tab = "overview" })
+		end })
+	end
+	if r.kind == "A" then
+		table.insert(actions, { "Show achievement", function ()
+			if not AchievementFrame and AchievementFrame_LoadUI then AchievementFrame_LoadUI() end
+			if AchievementFrame and AchievementFrame_SelectAchievement then
+				ShowUIPanel(AchievementFrame)
+				AchievementFrame_SelectAchievement(r.id)
+			end
+		end })
+	end
+	if line then text(line, GameFontHighlightSmall, GREY, 22, 4) end
+	if #actions > 0 then
+		local x = 18
+		for _, a in ipairs(actions) do
+			local b = button(a[1], a[2], x)
+			x = x + b:GetWidth() + 6
+		end
+		y = y + 28
+	end
 end
 
 -----------------------------------------
@@ -162,17 +234,7 @@ local function instanceOverview(ctx)
 	local reqs = st and st.requirements[variant.id]
 	if reqs and #reqs > 0 then
 		heading("To enter")
-		for _, r in ipairs(reqs) do
-			if r.kind == "L" then
-				check(r.have, "Level " .. r.id)
-			elseif r.kind == "I" then
-				check(r.have, "Carry " .. (GetItemInfo(r.id) or r.name))
-			elseif r.kind == "Q" then
-				check(r.have, "Complete the quest " .. r.name)
-			elseif r.kind == "A" then
-				check(r.have, "Achievement: " .. r.name)
-			end
-		end
+		for _, r in ipairs(reqs) do requirement(r) end
 	end
 
 	if J.IsLocked(variant) then

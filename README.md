@@ -1,10 +1,10 @@
-# Journal 2.10.0
+# Journal 2.11.0
 
 <div align="center">
 
 ![Interface Version](https://img.shields.io/badge/Interface-30300-blue)
 ![WoW Version](https://img.shields.io/badge/WoW-3.3.5a-orange)
-[![Version](https://img.shields.io/badge/Version-2.10.0-green)](https://github.com/EvilTactician/wow-mod-forever-journal)
+[![Version](https://img.shields.io/badge/Version-2.11.0-green)](https://github.com/EvilTactician/wow-mod-forever-journal)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
 </div>
@@ -101,7 +101,14 @@ the progression stage they need, then in the order they're usually done.
 (Scarlet Monastery, Dire Maul, Maraudon, Stratholme, Blackrock Depths) are split into their wings;
 rares come last. On the right, the difficulty menu and four tabs:
 - **Overview**: with no boss picked, the instance's difficulties with your lockout on each, what
-  it takes to enter, the entrance (with a map flag), wings and a summary of its quests. With a boss
+  it takes to enter, the entrance (with a map flag), wings and a summary of its quests. "To enter"
+  lists everything the realm checks at the door: the level, items, quests and achievements of
+  `dungeon_access_requirements`, what mod-individual-progression checks in its own code (the
+  Drakefire Amulet for Onyxia, the Argent Dawn attunement for 40 player Naxxramas) and, as optional
+  shortcuts, the Orb of Command into Blackwing Lair and Lothos Riftwaker into Molten Core. Each says
+  where to get it, with buttons to it: the quest (in the instance's Quests tab or the Quests tab)
+  and its giver on the map, the boss or creature that drops the item, the vendor (and the
+  reputation it asks), the boss an achievement asks you to defeat. With a boss
   picked, its model (drag to turn it, the wheel to zoom), level, health, the creatures fought in the encounter, its
   enrage timer ("Berserk after 10 min") and what it gives besides its loot.
 - **Abilities**: per creature, each ability with icon, cast time, tags and description. Spells
@@ -330,7 +337,7 @@ At startup the module builds an index:
   unobtainable when the catalog lacks it.
 
 Per player, the server adds lockouts and killed bosses (the instance save's encounter mask),
-entry requirements (`dungeon_access_requirements`), the progression stage and the toys in the
+entry requirements (`dungeon_access_requirements`, and where to get each), the progression stage and the toys in the
 bags and bank. The client itself knows which mounts and pets a character has.
 
 With mod-individual-progression each source carries the stage that opens it: Outland (outside

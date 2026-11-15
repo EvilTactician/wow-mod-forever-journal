@@ -44,6 +44,7 @@
 #include "StringFormat.h"
 #include "World.h"
 #include "WorldPacket.h"
+#include "AchievementMgr.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -203,6 +204,8 @@ namespace Journal::Index
             std::unordered_multimap<uint32, std::size_t> byMap;
             std::unordered_map<uint32, Giver> givers;            // quest -> who starts it
             std::unordered_map<uint32, uint32> questMaps;        // quest -> the map of the instance it's listed under
+            std::unordered_map<uint32, std::vector<std::pair<char, uint32>>> itemSources; // entry item -> Q quest / D, V creature
+            std::unordered_map<uint32, Giver> creatureSpots;     // source creatures: their first spawn
             std::unordered_map<uint32, uint32> baseOf;           // difficulty entry -> base entry
             std::unordered_set<uint32> learnable;                // base entries whose casts are remembered
             std::unordered_set<uint32> journalMaps;
@@ -509,8 +512,11 @@ namespace Journal::Index
 
                 for (uint8 d : difficulties)
                 {
-                    bool hidden = std::any_of(mine.begin(), mine.end(), [d](SeedVariant const* sv)
-                        { return sv->hidesDifficulty && sv->variant.difficulty == d; });
+                    // A difficulty a tab is played on gets no tab of its own, even when the tab isn't
+                    // there (mod-individual-progression installed but off: its 40 player
+                    // difficulty would read "40 Player (Heroic)").
+                    bool hidden = std::any_of(seedVariants.begin(), seedVariants.end(), [&](SeedVariant const& sv)
+                        { return sv.map == group.map && sv.hidesDifficulty && sv.variant.difficulty == d; });
                     if (hidden)
                         continue;
                     Variant v;
@@ -690,6 +696,120 @@ namespace Journal::Index
         }
 
         // Rare spawns in the instance, after its encounters.
+        // What lets you in that the core's dungeon_access_requirements don't list: what
+        // mod-individual-progression checks in its own code, and the core scripts' shortcuts.
+        struct ExtraRequirement
+        {
+            uint32 map;
+            int8 expansion;             // the tabs of this expansion, -1 every tab
+            char kind;                  // I item, Q quest
+            std::vector<uint32> ids;    // the same requirement: one per faction, or versions of a quest
+            bool optional;              // a shortcut, not a requirement
+            bool needsProgression;      // mod-individual-progression's own
+            char const* note;           // what the shortcut does
+        };
+        std::vector<ExtraRequirement> const EXTRA_REQUIREMENTS =
+        {
+            { 249, 0, 'I', { 16309 }, false, true, "" },                    // Drakefire Amulet
+            { 533, 0, 'Q', { 9121, 9122, 9123 }, false, true, "" },         // The Dread Citadel - Naxxramas
+            { 469, -1, 'Q', { 7761 }, true, false, "the Orb of Command in Blackrock Mountain takes you in" },
+            { 409, -1, 'Q', { 7848, 7487 }, true, false, "Lothos Riftwaker in Blackrock Mountain takes you in" },
+        };
+
+        // Where the items an instance asks for come from: quests rewarding them, creatures dropping
+        // or selling them (where those stand, for the journal's pointers).
+        void BuildRequirementSources()
+        {
+            std::unordered_set<uint32> items;
+            for (Instance const& inst : sData.instances)
+                for (Variant const& v : inst.variants)
+                    if (DungeonProgressionRequirements const* access = sObjectMgr->GetAccessRequirement(inst.map, Difficulty(v.difficulty)))
+                        for (ProgressionRequirement const* item : access->items)
+                            items.insert(item->id);
+            for (ExtraRequirement const& extra : EXTRA_REQUIREMENTS)
+                if (extra.kind == 'I')
+                    items.insert(extra.ids.begin(), extra.ids.end());
+            if (items.empty())
+                return;
+
+            for (auto const& [questId, quest] : sObjectMgr->GetQuestTemplates())
+            {
+                for (uint32 item : quest->RewardItemId)
+                    if (items.count(item))
+                        sData.itemSources[item].emplace_back('Q', questId);
+                for (uint32 item : quest->RewardChoiceItemId)
+                    if (items.count(item))
+                        sData.itemSources[item].emplace_back('Q', questId);
+            }
+
+            std::unordered_map<uint32, std::vector<uint32>> lootToCreatures;
+            for (auto const& [entry, cinfo] : *sObjectMgr->GetCreatureTemplates())
+                if (cinfo.lootid)
+                    lootToCreatures[cinfo.lootid].push_back(BaseEntry(entry));
+            std::unordered_set<uint32> sourceCreatures;
+            auto addDrop = [&](uint32 loot, uint32 item)
+            {
+                if (!items.count(item))
+                    return;
+                auto droppers = lootToCreatures.find(loot);
+                if (droppers == lootToCreatures.end())
+                    return;
+                for (uint32 creature : droppers->second)
+                {
+                    sourceCreatures.insert(creature);
+                    auto& list = sData.itemSources[item];
+                    if (std::find(list.begin(), list.end(), std::make_pair('D', creature)) == list.end())
+                        list.emplace_back('D', creature);
+                }
+            };
+            if (QueryResult result = WorldDatabase.Query("SELECT CAST(Entry AS UNSIGNED), CAST(Item AS UNSIGNED) "
+                "FROM creature_loot_template WHERE Reference = 0"))
+                do
+                {
+                    Field* f = result->Fetch();
+                    addDrop(uint32(f[0].Get<uint64>()), uint32(f[1].Get<uint64>()));
+                } while (result->NextRow());
+            if (QueryResult result = WorldDatabase.Query("SELECT CAST(c.Entry AS UNSIGNED), CAST(r.Item AS UNSIGNED) "
+                "FROM creature_loot_template c JOIN reference_loot_template r ON r.Entry = c.Reference "
+                "WHERE c.Reference > 0 AND r.Reference = 0"))
+                do
+                {
+                    Field* f = result->Fetch();
+                    addDrop(uint32(f[0].Get<uint64>()), uint32(f[1].Get<uint64>()));
+                } while (result->NextRow());
+
+            for (auto const& [entry, cinfo] : *sObjectMgr->GetCreatureTemplates())
+                if (cinfo.npcflag & UNIT_NPC_FLAG_VENDOR)
+                    if (VendorItemData const* vendor = sObjectMgr->GetNpcVendorItemList(entry))
+                        for (VendorItem const* vi : vendor->m_items)
+                            if (vi && items.count(vi->item))
+                            {
+                                sData.itemSources[vi->item].emplace_back('V', entry);
+                                sourceCreatures.insert(entry);
+                            }
+
+            // Where they stand: their first spawn.
+            for (auto const& [spawnId, data] : sObjectMgr->GetAllCreatureData())
+                if (sourceCreatures.count(data.id) && !sData.creatureSpots.count(data.id))
+                {
+                    Giver& g = sData.creatureSpots[data.id];
+                    g.kind = 'C';
+                    g.entry = data.id;
+                    if (CreatureTemplate const* t = sObjectMgr->GetCreatureTemplate(data.id))
+                        g.name = t->Name;
+                    g.map = data.mapid;
+                    g.x = data.posX;
+                    g.y = data.posY;
+                    g.placed = true;
+                    MapEntry const* map = sMapStore.LookupEntry(g.map);
+                    if (map && !map->Instanceable())
+                    {
+                        uint32 area = 0;
+                        sMapMgr->GetZoneAndAreaId(PHASEMASK_NORMAL, g.zone, area, g.map, g.x, g.y, data.posZ);
+                    }
+                }
+        }
+
         // Dungeons' levels from their normal mode bosses: from 3 below the lowest to 3 above the
         // highest (at most the expansion's top level), best at 2 below the last; each wing's from
         // its own. The last wing's best is also at least the level its quests need (not class,
@@ -1647,6 +1767,7 @@ namespace Journal::Index
         PlaceEntrances();
         BuildQuests();
         BuildLevels();
+        BuildRequirementSources();
         BuildSearch();
         if (GetConfig().collections)
             Collections::Build();
@@ -1758,7 +1879,140 @@ namespace Journal::Index
     //
     // SR:<req>:<instance>:<era state>, then SD rows:
     //   V,<variant>,<locked by era 0/1>,<era state needed>,<saved 0/1>,<seconds to reset>,<killed bits>
-    //   R,<variant>,<L level|I item|Q quest|A achievement>,<id>,<have 0/1>,<name>
+    //   R,<variant>,<L level|I item|Q quest|A achievement>,<id>,<have 0/1>,<name>,<optional 0/1>,
+    //     <source>,<source id>,<source name>,<where>,<instance>,<boss>,<text>,<what the shortcut does>
+    //     source: G the quest's giver (id the quest; instance 1 when it's one of this instance's quests),
+    //             Q a quest rewarding the item (the same), D a creature dropping it (id the creature;
+    //             instance and boss when it's a journal boss), V a vendor (id the creature; text: the
+    //             reputation it asks), B the boss to defeat for the achievement (instance, boss), - none
+    namespace
+    {
+        std::string SpotWhere(Giver const& g)
+        {
+            if (!g.placed)
+                return "";
+            if (g.zone)
+                return AreaName(g.zone);
+            Place place;
+            if (FindInstanceOnMap(g.map, place))
+                return place.name;
+            return MapName(g.map);
+        }
+
+        // The journal boss a creature is: the instance and the boss key, or nullptr.
+        Boss const* BossOf(uint32 creature, uint32& instanceId)
+        {
+            creature = BaseEntry(creature);
+            for (Instance const& inst : sData.instances)
+                for (Boss const& b : inst.bosses)
+                    if (!b.rare && std::find(b.creatures.begin(), b.creatures.end(), creature) != b.creatures.end())
+                    {
+                        instanceId = inst.id;
+                        return &b;
+                    }
+            return nullptr;
+        }
+
+        char const* const RANK_NAMES[] = { "Hated", "Hostile", "Unfriendly", "Neutral", "Friendly", "Honored", "Revered", "Exalted" };
+
+        void AppendRequirement(Player* player, Instance const& inst, Variant const& v, char kind, uint32 id, bool have,
+            std::string const& name, bool optional, std::string_view note, std::vector<std::string>& rows)
+        {
+            char source = '-';
+            uint32 sourceId = 0, instanceId = 0, bossKey = 0;
+            std::string sourceName, where, text;
+            auto ofThisInstance = [&](uint32 questId)
+            {
+                return std::find(inst.quests.begin(), inst.quests.end(), questId) != inst.quests.end() ? 1u : 0u;
+            };
+            if (kind == 'Q')
+            {
+                char giverKind = '-';
+                if (Quests::GiverOf(id, giverKind, sourceName, where))
+                    source = 'G';
+                sourceId = id;
+                instanceId = ofThisInstance(id);
+            }
+            else if (kind == 'I')
+            {
+                auto itr = sData.itemSources.find(id);
+                if (itr != sData.itemSources.end())
+                {
+                    for (auto const& [k, entry] : itr->second)
+                    {
+                        Quest const* q = k == 'Q' ? sObjectMgr->GetQuestTemplate(entry) : nullptr;
+                        if (!q || !player->SatisfyQuestRace(q, false) || !player->SatisfyQuestClass(q, false))
+                            continue;
+                        source = 'Q';
+                        sourceId = Quests::ShownVersion(player, entry);
+                        sourceName = q->GetTitle();
+                        char giverKind = '-';
+                        std::string giver, giverWhere;
+                        if (Quests::GiverOf(sourceId, giverKind, giver, giverWhere))
+                            where = giverWhere.empty() ? giver : giver + ", " + giverWhere;
+                        instanceId = ofThisInstance(sourceId);
+                        break;
+                    }
+                    for (char want : { 'D', 'V' })
+                    {
+                        if (source != '-')
+                            break;
+                        uint32 first = 0;
+                        for (auto const& [k, entry] : itr->second)
+                        {
+                            if (k != want)
+                                continue;
+                            uint32 inInstance = 0;
+                            if (want == 'D' && BossOf(entry, inInstance))
+                            {
+                                first = entry;
+                                break;
+                            }
+                            if (!first)
+                                first = entry;
+                        }
+                        if (!first)
+                            continue;
+                        source = want;
+                        sourceId = first;
+                        if (CreatureTemplate const* t = sObjectMgr->GetCreatureTemplate(first))
+                            sourceName = t->Name;
+                        if (auto spot = sData.creatureSpots.find(first); spot != sData.creatureSpots.end())
+                            where = SpotWhere(spot->second);
+                        if (want == 'D')
+                        {
+                            if (Boss const* b = BossOf(first, instanceId))
+                            {
+                                bossKey = b->key;
+                                sourceName = b->name;
+                            }
+                        }
+                        else if (ItemTemplate const* proto = sObjectMgr->GetItemTemplate(id); proto && proto->RequiredReputationFaction)
+                            if (FactionEntry const* faction = sFactionStore.LookupEntry(proto->RequiredReputationFaction))
+                                text = std::string(RANK_NAMES[std::min<uint32>(proto->RequiredReputationRank, 7)]) + " with "
+                                    + DbcString(faction->name);
+                    }
+                }
+            }
+            else if (kind == 'A')
+            {
+                if (AchievementCriteriaEntryList const* criteria = sAchievementMgr->GetAchievementCriteriaByAchievement(id))
+                    for (AchievementCriteriaEntry const* c : *criteria)
+                        if (c->requiredType == ACHIEVEMENT_CRITERIA_TYPE_KILL_CREATURE)
+                            if (Boss const* b = BossOf(c->kill_creature.creatureID, instanceId))
+                            {
+                                source = 'B';
+                                bossKey = b->key;
+                                sourceName = b->name;
+                                break;
+                            }
+            }
+            rows.push_back(Acore::StringFormat("R,{},{},{},{},{},{},{},{},{},{},{},{},{},{}", v.id, kind, id, have ? 1 : 0,
+                Escape(name, 50), optional ? 1 : 0, source, sourceId, Escape(sourceName, 40), Escape(where, 60),
+                instanceId, bossKey, Escape(text, 60), Escape(note, 80)));
+        }
+    }
+
     void HandleStatus(Player* player, std::string const& req, std::vector<std::string_view> const& args)
     {
         Instance const* inst = FindInstance(args, 2);
@@ -1788,41 +2042,76 @@ namespace Journal::Index
                 }
             rows.push_back(Acore::StringFormat("V,{},{},{},{},{},{}", v.id, locked ? 1 : 0, v.reqState, saved, resetIn, killed));
 
-            DungeonProgressionRequirements const* access = sObjectMgr->GetAccessRequirement(inst->map, Difficulty(v.difficulty));
-            if (!access)
-                continue;
-            if (access->levelMin)
-                rows.push_back(Acore::StringFormat("R,{},L,{},{},-", v.id, access->levelMin, player->GetLevel() >= access->levelMin ? 1 : 0));
-            TeamId team = player->GetTeamId(true);
-            for (ProgressionRequirement const* item : access->items)
+            if (DungeonProgressionRequirements const* access = sObjectMgr->GetAccessRequirement(inst->map, Difficulty(v.difficulty)))
             {
-                if (item->faction != TEAM_NEUTRAL && item->faction != team)
-                    continue;
-                ItemTemplate const* proto = sObjectMgr->GetItemTemplate(item->id);
-                if (!proto)
-                    continue;
-                bool have = player->HasItemCount(item->id, 1, true);
-                rows.push_back(Acore::StringFormat("R,{},I,{},{},{}", v.id, item->id, have ? 1 : 0, Escape(proto->Name1, 50)));
+                if (access->levelMin)
+                    rows.push_back(Acore::StringFormat("R,{},L,{},{},-", v.id, access->levelMin, player->GetLevel() >= access->levelMin ? 1 : 0));
+                TeamId team = player->GetTeamId(true);
+                for (ProgressionRequirement const* item : access->items)
+                {
+                    if (item->faction != TEAM_NEUTRAL && item->faction != team)
+                        continue;
+                    ItemTemplate const* proto = sObjectMgr->GetItemTemplate(item->id);
+                    if (!proto)
+                        continue;
+                    bool have = player->HasItemCount(item->id, 1, true);
+                    AppendRequirement(player, *inst, v, 'I', item->id, have, proto->Name1, false, "", rows);
+                }
+                for (ProgressionRequirement const* quest : access->quests)
+                {
+                    if (quest->faction != TEAM_NEUTRAL && quest->faction != team)
+                        continue;
+                    Quest const* q = sObjectMgr->GetQuestTemplate(quest->id);
+                    if (!q)
+                        continue;
+                    bool done = player->IsQuestRewarded(quest->id);
+                    AppendRequirement(player, *inst, v, 'Q', quest->id, done, q->GetTitle(), false, "", rows);
+                }
+                for (ProgressionRequirement const* ach : access->achievements)
+                {
+                    if (ach->faction != TEAM_NEUTRAL && ach->faction != team)
+                        continue;
+                    AchievementEntry const* entry = sAchievementStore.LookupEntry(ach->id);
+                    if (!entry)
+                        continue;
+                    bool have = player->HasAchieved(ach->id);
+                    AppendRequirement(player, *inst, v, 'A', ach->id, have, DbcString(entry->name), false, "", rows);
+                }
             }
-            for (ProgressionRequirement const* quest : access->quests)
+
+            // What mod-individual-progression checks in its own code, and the core scripts' shortcuts.
+            for (ExtraRequirement const& extra : EXTRA_REQUIREMENTS)
             {
-                if (quest->faction != TEAM_NEUTRAL && quest->faction != team)
+                if (extra.map != inst->map || (extra.expansion >= 0 && uint8(extra.expansion) != v.expansion))
                     continue;
-                Quest const* q = sObjectMgr->GetQuestTemplate(quest->id);
-                if (!q)
+                if (extra.needsProgression && !GetConfig().progressionEnabled)
                     continue;
-                bool done = player->IsQuestRewarded(quest->id);
-                rows.push_back(Acore::StringFormat("R,{},Q,{},{},{}", v.id, quest->id, done ? 1 : 0, Escape(q->GetTitle(), 50)));
-            }
-            for (ProgressionRequirement const* ach : access->achievements)
-            {
-                if (ach->faction != TEAM_NEUTRAL && ach->faction != team)
+                if (extra.kind == 'I')
+                {
+                    ItemTemplate const* proto = sObjectMgr->GetItemTemplate(extra.ids.front());
+                    if (!proto)
+                        continue;
+                    bool have = player->HasItemCount(proto->ItemId, 1, true);
+                    AppendRequirement(player, *inst, v, 'I', proto->ItemId, have, proto->Name1, extra.optional, extra.note, rows);
                     continue;
-                AchievementEntry const* entry = sAchievementStore.LookupEntry(ach->id);
-                if (!entry)
-                    continue;
-                bool have = player->HasAchieved(ach->id);
-                rows.push_back(Acore::StringFormat("R,{},A,{},{},{}", v.id, ach->id, have ? 1 : 0, Escape(DbcString(entry->name), 50)));
+                }
+                uint32 shown = 0;
+                bool done = false;
+                std::string title;
+                for (uint32 questId : extra.ids)
+                {
+                    Quest const* q = sObjectMgr->GetQuestTemplate(questId);
+                    if (!q)
+                        continue;
+                    done = done || player->IsQuestRewarded(questId);
+                    if (!shown && player->SatisfyQuestRace(q, false))
+                    {
+                        shown = Quests::ShownVersion(player, questId);
+                        title = q->GetTitle();
+                    }
+                }
+                if (shown)
+                    AppendRequirement(player, *inst, v, 'Q', shown, done, title, extra.optional, extra.note, rows);
             }
         }
         Send(player, "SR:" + req + ":" + std::to_string(inst->id) + ":" + std::to_string(state));
@@ -2086,7 +2375,8 @@ namespace Journal::Index
 
     // ---- M: a map flag on an entrance or a quest giver ------------------------------------------
     //
-    // M:<req>:E:<instance>  or  M:<req>:Q:<quest>   -> M:<req>:ok:<where>, or ERR:<req>:none
+    // M:<req>:E:<instance>, M:<req>:Q:<quest> or M:<req>:C:<creature of a "To enter" pointer>
+    //   -> M:<req>:ok:<where>, or ERR:<req>:none
     void HandleMapPin(Player* player, std::string const& req, std::vector<std::string_view> const& args)
     {
         if (args.size() > 2 && args[2] == "S")
@@ -2124,6 +2414,20 @@ namespace Journal::Index
                 // A quest of the Quests tab, outside the dungeon journal.
                 if (!Quests::ShowGiver(player, req, id))
                     SendError(player, req, "none");
+                return;
+            }
+            Giver const& g = itr->second;
+            SendPoi(player, g.map, g.x, g.y, g.name);
+            Send(player, "M:" + req + ":ok:" + Escape(WhereText(player, g.map, g.x, g.y, g.zone), 120));
+            return;
+        }
+        if (args[2] == "C")
+        {
+            // A creature the "To enter" list points to (one dropping or selling what lets you in).
+            auto itr = sData.creatureSpots.find(id);
+            if (itr == sData.creatureSpots.end() || !itr->second.placed)
+            {
+                SendError(player, req, "none");
                 return;
             }
             Giver const& g = itr->second;

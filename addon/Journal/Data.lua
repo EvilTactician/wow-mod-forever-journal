@@ -231,7 +231,13 @@ function J.LoadStatus(inst, done, force)
 					at = GetTime() }
 			elseif r[1] == "R" then
 				out.requirements[r[2]] = out.requirements[r[2]] or {}
-				table.insert(out.requirements[r[2]], { kind = r[3], id = r[4], have = r[5] == 1, name = Unescape(tostring(r[6] or "-")) })
+				local function str(v) return Unescape(tostring(v or "-")) end
+				-- What it is, and where to get it (see Index::HandleStatus): source G giver, Q quest
+				-- reward, D drop, V vendor, B boss.
+				table.insert(out.requirements[r[2]], { kind = r[3], id = r[4], have = r[5] == 1, name = str(r[6]),
+					optional = r[7] == 1, source = tostring(r[8] or "-"), sourceId = tonumber(r[9]) or 0,
+					sourceName = str(r[10]), where = str(r[11]), inst = tonumber(r[12]) or 0, boss = tonumber(r[13]) or 0,
+					text = str(r[14]), note = str(r[15]) })
 			end
 		end
 		return out
