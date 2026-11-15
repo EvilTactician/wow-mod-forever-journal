@@ -133,6 +133,24 @@ end
 
 -- The tab of an instance to show for a tier: the one the era has opened, the later one when
 -- several are open (25 player over 10), else the first.
+-- An instance's quests for a tier's tab: in an instance with tabs in more than one expansion
+-- (Onyxia, Naxxramas), the quests of that expansion's levels (up to 60, 61-70, 71-80).
+function J.QuestsForTier(inst, tier, quests)
+	if not quests or tier == nil then return quests end
+	local mixed = false
+	for _, v in ipairs(inst.variants) do
+		if v.expansion ~= inst.expansion then mixed = true end
+	end
+	if not mixed then return quests end
+	local out = {}
+	for _, q in ipairs(quests) do
+		local level = tonumber(q.level) or 0
+		local band = level > 70 and 2 or level > 60 and 1 or 0
+		if level <= 0 or band == tier then table.insert(out, q) end
+	end
+	return out
+end
+
 function J.VariantsFor(inst, tier)
 	local out = {}
 	for _, v in ipairs(inst.variants) do

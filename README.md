@@ -93,8 +93,8 @@ A dungeon's levels come from its normal mode bosses on your realm (the Dungeon F
 Wrath's, which mod-individual-progression's vanilla creature levels don't match): from 3 below
 its lowest boss to 3 above its highest, and an estimated best level ("best ~32") 2 below its last
 boss, or the level its quests need when that's higher. Each wing gets its own, as each is entered
-separately ("best ~32-40" across Scarlet Monastery's). A raid is for one level: 60, 70 or 80 (the
-Dungeon Finder's ranges run to 83); no level goes past 80. Dungeons are listed by best level; raids by
+separately ("best ~32-40" across Scarlet Monastery's). A raid is for its expansion's top level: 60,
+70 or 80 (the Dungeon Finder's ranges run to 83); no level goes past 80. Dungeons are listed by best level; raids by
 the progression stage they need, then in the order they're usually done.
 
 **An instance**: its art, levels and group size over the boss list (the entrance zone is on its Overview). Multi-wing dungeons
@@ -302,7 +302,9 @@ At startup the module builds an index:
 - **quests** sorted under the instance's zone or under the subzone of the same name outside it
   (Gnomeregan in Dun Morogh), asking for creatures or quest drops found only there, or handed out
   only there (by someone inside, or by an item that drops only there); status per player from the
-  core's own checks, XP including other modules' changes (such as mod-forever-dungeon-xp);
+  core's own checks, XP including other modules' changes (such as mod-forever-dungeon-xp); in an
+  instance with tabs in more than one expansion (Onyxia, Naxxramas) each tier shows the quests of
+  its levels;
 - **every quest** with a giver (`creature_queststarter`, `gameobject_queststarter`, their
   `game_event_*_quest` holiday versions, quest-starting items, spells, SmartAI, Dungeon Finder
   rewards, chain follow-ups) under its `QuestSortID` heading: a zone (subzones go to their zone),

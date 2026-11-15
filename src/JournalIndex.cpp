@@ -13,8 +13,8 @@
  * Finder's ranges are Wrath's, which mod-individual-progression's vanilla creature levels don't
  * match): from 3 below its lowest normal mode boss to 3 above its highest, best at 2 below its
  * last boss, or at the level its quests need when that's higher; each wing's the same way. A raid
- * is for one level, the lowest the Dungeon Finder allows in (60, 70 or 80: its range runs to 83).
- * No level goes past 80.
+ * is for its expansion's top level (60, 70 or 80: the Dungeon Finder's ranges run to 83). No level
+ * goes past 80.
  *
  * Difficulty tabs ("variants") are the map's difficulties, plus mod_forever_journal_variant rows
  * such as mod-individual-progression's 40 player Onyxia and Naxxramas. Each tab is listed under
@@ -698,16 +698,16 @@ namespace Journal::Index
         {
             for (Instance& inst : sData.instances)
             {
+                uint8 cap = inst.expansion >= 2 ? 80 : inst.expansion == 1 ? 70 : 60;
                 for (Variant& v : inst.variants)
                     v.minLevel = std::min<uint8>(v.minLevel, 80);
                 if (inst.kind != KIND_DUNGEON)
                 {
-                    inst.minLevel = inst.maxLevel = inst.targetLevel = std::min<uint8>(inst.minLevel, 80);
+                    inst.minLevel = inst.maxLevel = inst.targetLevel = cap;
                     for (Wing& wing : inst.wings)
                         wing.minLevel = wing.maxLevel = inst.minLevel;
                     continue;
                 }
-                uint8 cap = inst.expansion >= 2 ? 80 : inst.expansion == 1 ? 70 : 60;
                 uint8 lowest = 255, highest = 0, best = 255;
                 Wing* last = nullptr;
                 uint8 lastHi = 0;
@@ -1788,6 +1788,14 @@ namespace Journal::Index
                 }
             rows.push_back(Acore::StringFormat("V,{},{},{},{},{},{}", v.id, locked ? 1 : 0, v.reqState, saved, resetIn, killed));
 
+            // A tab of another expansion (40 player Onyxia) isn't the map's own difficulty: the
+            // core's requirements are the other one's, so only its own level counts.
+            if (v.expansion != inst->expansion)
+            {
+                if (v.minLevel)
+                    rows.push_back(Acore::StringFormat("R,{},L,{},{},-", v.id, v.minLevel, player->GetLevel() >= v.minLevel ? 1 : 0));
+                continue;
+            }
             DungeonProgressionRequirements const* access = sObjectMgr->GetAccessRequirement(inst->map, Difficulty(v.difficulty));
             if (!access)
                 continue;

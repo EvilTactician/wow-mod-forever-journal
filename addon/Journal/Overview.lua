@@ -204,6 +204,7 @@ local function instanceOverview(ctx)
 	local questLine = text("Loading...", GameFontHighlight, GREY)
 	J.LoadQuests(inst, function (quests)
 		if not quests or mine ~= serial then return end
+		quests = J.QuestsForTier(inst, J.view.tier, quests)
 		local available, active, done = 0, 0, 0
 		for _, q in ipairs(quests) do
 			if q.state == J.QUEST.AVAILABLE then available = available + 1

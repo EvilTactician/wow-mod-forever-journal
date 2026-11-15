@@ -355,6 +355,7 @@ function pane:Refresh(ctx)
 	end
 	J.LoadQuests(ctx.inst, function (quests)
 		if mine ~= serial then return end
+		quests = J.QuestsForTier(ctx.inst, J.view.tier, quests)
 		local shown, done = {}, 0
 		for _, q in ipairs(quests or {}) do
 			if q.state == Q.DONE then done = done + 1 end
