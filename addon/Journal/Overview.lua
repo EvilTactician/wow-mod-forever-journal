@@ -70,7 +70,7 @@ local function heading(str)
 end
 
 -- A line with a ready-check tick or cross in front.
--- optional: a shortcut not done yet reads grey, not red.
+-- Met reads grey, missing red; a shortcut not taken yet (optional) white.
 local function check(ok, str, optional)
 	local icon = icons:Get()
 	icon:SetTexture(ok and "Interface\\RaidFrame\\ReadyCheck-Ready"
@@ -78,7 +78,7 @@ local function check(ok, str, optional)
 	icon:SetSize(14, 14)
 	icon:ClearAllPoints()
 	icon:SetPoint("TOPLEFT", c, "TOPLEFT", 6, -y + 1)
-	text(str, GameFontHighlight, ok and nil or optional and GREY or RED, 22, 4)
+	text(str, GameFontHighlight, ok and GREY or (not optional and RED) or nil, 22, 4)
 end
 
 local function button(label, onClick, x)
@@ -106,18 +106,26 @@ local function requirement(r)
 
 	local line
 	local actions = {}
+	-- The quest itself shows its giver on the map.
 	local function questActions(questId, ofThisInstance)
 		table.insert(actions, { "Show quest", function ()
 			if ofThisInstance then J.Show({ tab = "quests" }) else Journal.OpenQuest(questId) end
 		end })
-		if J.Has(J.HELLO_MAP_PINS) then
-			table.insert(actions, { "Show on map", function () J.ShowOnMap("Q", questId) end })
-		end
 	end
 	local function at(where) return where ~= "" and (", " .. where) or "" end
 	if r.source == "G" then
 		line = "Given by " .. r.sourceName .. at(r.where)
 		questActions(r.sourceId, r.inst == 1)
+	elseif r.source == "S" then
+		line = "Starts from the item " .. r.sourceName .. ", which drops from " .. r.text .. at(r.where)
+		questActions(r.sourceId, false)
+		if r.inst > 0 and r.boss > 0 then
+			table.insert(actions, { "Show boss", function ()
+				J.Show({ page = "instance", instance = r.inst, boss = r.boss, tab = "loot" })
+			end })
+		elseif r.boss > 0 and J.Has(J.HELLO_MAP_PINS) then
+			table.insert(actions, { "Show on map", function () J.ShowOnMap("C", r.boss) end })
+		end
 	elseif r.source == "Q" then
 		line = "Reward from the quest " .. r.sourceName .. (r.where ~= "" and (" (" .. r.where .. ")") or "")
 		questActions(r.sourceId, r.inst == 1)

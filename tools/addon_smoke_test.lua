@@ -426,7 +426,7 @@ local function serve(msg)
 	elseif cmd == "S" then
 		list("S", req, args[3] .. ":3", { "V,0,0,0,1,7200,64", "R,0,L,10,1,-",
 			"R,0,I,2874,0,Unsent Letter,0,D,639,Edwin VanCleef,The Deadmines,6,64,-,-",
-			"R,0,Q,7761,0,Blackhand's Command,1,G,7761,Scarshield Quartermaster,Burning Steppes,0,0,-,the Orb of Command takes you in",
+			"R,0,Q,7761,0,Blackhand's Command,1,S,7761,Blackhand's Command,Blackrock Spire,6,64,Edwin VanCleef,the Orb of Command takes you in",
 			"V,1,1,13,0,0,0", "V,101,1,6,0,0,0" })
 	elseif cmd == "A" then
 		list("A", req, args[3] .. ":" .. args[4] .. ":" .. args[5], {
@@ -699,7 +699,7 @@ step("open Deadmines: bosses, rares, overview, lockout and requirements", functi
 	assert(textShown("Carry Unsent Letter"), "requirement missing")
 	assert(textShown("Drops from Edwin VanCleef"), "requirement's source missing")
 	assert(textShown("Optional shortcut: complete the quest Blackhand's Command"), "optional shortcut missing")
-	assert(textShown("Given by Scarshield Quartermaster"), "shortcut quest's giver missing")
+	assert(textShown("Starts from the item Blackhand's Command, which drops from Edwin VanCleef"), "shortcut quest's item missing")
 	assert(textShown("1 to pick up"), "quest summary missing")
 end)
 
@@ -713,7 +713,6 @@ step("entrance on the map, requirement pointers", function ()
 		asked[sent[#sent]:gsub("^M:%d+:", "")] = true
 	end
 	assert(asked["E:6"], "entrance flag not asked")
-	assert(asked["Q:7761"], "shortcut quest's giver flag not asked")
 	local boss = buttonShown("Show boss")
 	assert(boss, "the requirement's boss can't be opened")
 end)

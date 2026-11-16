@@ -399,8 +399,8 @@ namespace Journal
         // A red flag on the quest's giver and "M:<req>:ok:<where>"; false when nobody known gives it.
         bool ShowGiver(Player* player, std::string const& req, uint32 questId);
 
-        // Who gives a quest (kind C/G/I, name) and where; false when the Quests tab doesn't know.
-        bool GiverOf(uint32 questId, char& kind, std::string& giver, std::string& where);
+        // Who gives a quest (kind C/G/I, its entry, name) and where; false when the Quests tab doesn't know.
+        bool GiverOf(uint32 questId, char& kind, uint32& entry, std::string& giver, std::string& where);
 
         // The quest log group a zone is listed in: 'E', 'K', 'O', 'N' for the continents (the blood
         // elf and draenei zones with their quest log's), 'D', 'R', 'B' for instances, 'X' else.

@@ -726,9 +726,18 @@ namespace Journal::Index
                     if (DungeonProgressionRequirements const* access = sObjectMgr->GetAccessRequirement(inst.map, Difficulty(v.difficulty)))
                         for (ProgressionRequirement const* item : access->items)
                             items.insert(item->id);
+            // and the items that start the quests asked for (Blackhand's Command).
+            std::unordered_set<uint32> quests;
+            for (Instance const& inst : sData.instances)
+                for (Variant const& v : inst.variants)
+                    if (DungeonProgressionRequirements const* access = sObjectMgr->GetAccessRequirement(inst.map, Difficulty(v.difficulty)))
+                        for (ProgressionRequirement const* quest : access->quests)
+                            quests.insert(quest->id);
             for (ExtraRequirement const& extra : EXTRA_REQUIREMENTS)
-                if (extra.kind == 'I')
-                    items.insert(extra.ids.begin(), extra.ids.end());
+                (extra.kind == 'I' ? items : quests).insert(extra.ids.begin(), extra.ids.end());
+            for (auto const& [entry, proto] : *sObjectMgr->GetItemTemplateStore())
+                if (proto.StartQuest && quests.count(proto.StartQuest))
+                    items.insert(entry);
             if (items.empty())
                 return;
 
@@ -1882,9 +1891,12 @@ namespace Journal::Index
     //   R,<variant>,<L level|I item|Q quest|A achievement>,<id>,<have 0/1>,<name>,<optional 0/1>,
     //     <source>,<source id>,<source name>,<where>,<instance>,<boss>,<text>,<what the shortcut does>
     //     source: G the quest's giver (id the quest; instance 1 when it's one of this instance's quests),
-    //             Q a quest rewarding the item (the same), D a creature dropping it (id the creature;
-    //             instance and boss when it's a journal boss), V a vendor (id the creature; text: the
-    //             reputation it asks), B the boss to defeat for the achievement (instance, boss), - none
+    //             S the item starting the quest (id the quest, name the item, text the creature dropping
+    //             it, where; instance and boss when it's a journal boss, else 0 and the creature),
+    //             Q a quest rewarding the item (id the quest, instance as G's), D a creature dropping it
+    //             (id the creature; instance and boss when it's a journal boss), V a vendor (id the
+    //             creature; text: the reputation it asks), B the boss to defeat for the achievement
+    //             (instance, boss), - none
     namespace
     {
         std::string SpotWhere(Giver const& g)
@@ -1925,13 +1937,58 @@ namespace Journal::Index
             {
                 return std::find(inst.quests.begin(), inst.quests.end(), questId) != inst.quests.end() ? 1u : 0u;
             };
+            // The creature dropping an item, a journal boss first: fills where, instance and boss.
+            auto dropper = [&](uint32 item, std::string& name) -> uint32
+            {
+                auto itr = sData.itemSources.find(item);
+                if (itr == sData.itemSources.end())
+                    return 0;
+                uint32 first = 0;
+                for (auto const& [k, entry] : itr->second)
+                {
+                    uint32 inInstance = 0;
+                    if (k == 'D' && BossOf(entry, inInstance))
+                    {
+                        first = entry;
+                        break;
+                    }
+                    if (k == 'D' && !first)
+                        first = entry;
+                }
+                if (!first)
+                    return 0;
+                if (CreatureTemplate const* t = sObjectMgr->GetCreatureTemplate(first))
+                    name = t->Name;
+                if (auto spot = sData.creatureSpots.find(first); spot != sData.creatureSpots.end())
+                    where = SpotWhere(spot->second);
+                if (Boss const* b = BossOf(first, instanceId))
+                {
+                    bossKey = b->key;
+                    name = b->name;
+                }
+                return first;
+            };
+
             if (kind == 'Q')
             {
                 char giverKind = '-';
-                if (Quests::GiverOf(id, giverKind, sourceName, where))
+                uint32 giverEntry = 0;
+                if (Quests::GiverOf(id, giverKind, giverEntry, sourceName, where))
                     source = 'G';
                 sourceId = id;
                 instanceId = ofThisInstance(id);
+                // Started by an item: say where it drops.
+                if (giverKind == 'I')
+                {
+                    where.clear();
+                    instanceId = 0;
+                    if (uint32 creature = dropper(giverEntry, text))
+                    {
+                        source = 'S';
+                        if (!instanceId)
+                            bossKey = creature;
+                    }
+                }
             }
             else if (kind == 'I')
             {
@@ -1947,8 +2004,9 @@ namespace Journal::Index
                         sourceId = Quests::ShownVersion(player, entry);
                         sourceName = q->GetTitle();
                         char giverKind = '-';
+                        uint32 giverEntry = 0;
                         std::string giver, giverWhere;
-                        if (Quests::GiverOf(sourceId, giverKind, giver, giverWhere))
+                        if (Quests::GiverOf(sourceId, giverKind, giverEntry, giver, giverWhere))
                             where = giverWhere.empty() ? giver : giver + ", " + giverWhere;
                         instanceId = ofThisInstance(sourceId);
                         break;

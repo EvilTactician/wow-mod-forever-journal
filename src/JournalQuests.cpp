@@ -1085,12 +1085,13 @@ namespace Journal::Quests
         Send(player, "IE:" + req);
     }
 
-    bool GiverOf(uint32 questId, char& kind, std::string& giver, std::string& where)
+    bool GiverOf(uint32 questId, char& kind, uint32& entry, std::string& giver, std::string& where)
     {
         auto itr = sData.entries.find(questId);
         if (itr == sData.entries.end() || itr->second.giverKind == '-')
             return false;
         kind = itr->second.giverKind;
+        entry = itr->second.giverEntry;
         giver = itr->second.giver;
         where = WhereOf(itr->second, nullptr);
         return true;
