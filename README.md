@@ -1,10 +1,10 @@
-# Journal 2.9.0
+# Journal 2.11.1
 
 <div align="center">
 
 ![Interface Version](https://img.shields.io/badge/Interface-30300-blue)
 ![WoW Version](https://img.shields.io/badge/WoW-3.3.5a-orange)
-[![Version](https://img.shields.io/badge/Version-2.9.0-green)](https://github.com/EvilTactician/wow-mod-forever-journal)
+[![Version](https://img.shields.io/badge/Version-2.11.1-green)](https://github.com/EvilTactician/wow-mod-forever-journal)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
 </div>
@@ -86,14 +86,29 @@ The window has a tab along the bottom for each part of the journal. Tabs other a
 ### Dungeons and Raids
 
 **Home**: a tier menu (Classic, Burning Crusade, Wrath of the Lich King) and a tile per instance
-with its Dungeon Finder art. Instances your progression stage hasn't
+with its Dungeon Finder art and levels. Instances your progression stage hasn't
 opened carry a lock and the stage they open at.
 
-**An instance**: its art, levels and entrance zone over the boss list. Multi-wing dungeons
+A dungeon's levels come from its normal mode bosses on your realm (the Dungeon Finder's are
+Wrath's, which mod-individual-progression's vanilla creature levels don't match): from 3 below
+its lowest boss to 3 above its highest, and an estimated best level ("best ~32") 2 below its last
+boss, or the level its quests need when that's higher. Each wing gets its own, as each is entered
+separately ("best ~32-40" across Scarlet Monastery's). A raid is for its expansion's top level: 60,
+70 or 80 (the Dungeon Finder's ranges run to 83); no level goes past 80. Dungeons are listed by best level; raids by
+the progression stage they need, then in the order they're usually done.
+
+**An instance**: its art, levels and group size over the boss list (the entrance zone is on its Overview). Multi-wing dungeons
 (Scarlet Monastery, Dire Maul, Maraudon, Stratholme, Blackrock Depths) are split into their wings;
 rares come last. On the right, the difficulty menu and four tabs:
 - **Overview**: with no boss picked, the instance's difficulties with your lockout on each, what
-  it takes to enter, the entrance (with a map flag), wings and a summary of its quests. With a boss
+  it takes to enter, the entrance (with a map flag), wings and a summary of its quests. "To enter"
+  lists everything the realm checks at the door: the level, items, quests and achievements of
+  `dungeon_access_requirements`, what mod-individual-progression checks in its own code (the
+  Drakefire Amulet for Onyxia, the Argent Dawn attunement for 40 player Naxxramas) and, as optional
+  shortcuts, the Orb of Command into Blackwing Lair and Lothos Riftwaker into Molten Core. Each says
+  where to get it, with buttons to it: the quest (in the instance's Quests tab or the Quests tab),
+  the boss or creature dropping the item that starts it or the item asked for, the vendor (and the
+  reputation it asks), the boss an achievement asks you to defeat. With a boss
   picked, its model (drag to turn it, the wheel to zoom), level, health, the creatures fought in the encounter, its
   enrage timer ("Berserk after 10 min") and what it gives besides its loot.
 - **Abilities**: per creature, each ability with icon, cast time, tags and description. Spells
@@ -294,7 +309,9 @@ At startup the module builds an index:
 - **quests** sorted under the instance's zone or under the subzone of the same name outside it
   (Gnomeregan in Dun Morogh), asking for creatures or quest drops found only there, or handed out
   only there (by someone inside, or by an item that drops only there); status per player from the
-  core's own checks, XP including other modules' changes (such as mod-forever-dungeon-xp);
+  core's own checks, XP including other modules' changes (such as mod-forever-dungeon-xp); in an
+  instance with tabs in more than one expansion (Onyxia, Naxxramas) each tier shows the quests of
+  its levels;
 - **every quest** with a giver (`creature_queststarter`, `gameobject_queststarter`, their
   `game_event_*_quest` holiday versions, quest-starting items, spells, SmartAI, Dungeon Finder
   rewards, chain follow-ups) under its `QuestSortID` heading: a zone (subzones go to their zone),
@@ -320,7 +337,7 @@ At startup the module builds an index:
   unobtainable when the catalog lacks it.
 
 Per player, the server adds lockouts and killed bosses (the instance save's encounter mask),
-entry requirements (`dungeon_access_requirements`), the progression stage and the toys in the
+entry requirements (`dungeon_access_requirements`, and where to get each), the progression stage and the toys in the
 bags and bank. The client itself knows which mounts and pets a character has.
 
 With mod-individual-progression each source carries the stage that opens it: Outland (outside

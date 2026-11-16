@@ -424,7 +424,9 @@ local function serve(msg)
 			list("B", req, args[3] .. ":2", { "0,0,15956,0,7,Anub'Rekhan", "8,0,16063,2,7,The Four Horsemen" })
 		end
 	elseif cmd == "S" then
-		list("S", req, args[3] .. ":3", { "V,0,0,0,1,7200,64", "R,0,L,10,1,-", "R,0,I,2874,0,Unsent Letter",
+		list("S", req, args[3] .. ":3", { "V,0,0,0,1,7200,64", "R,0,L,10,1,-",
+			"R,0,I,2874,0,Unsent Letter,0,D,639,Edwin VanCleef,The Deadmines,6,64,-,-",
+			"R,0,Q,7761,0,Blackhand's Command,1,S,7761,Blackhand's Command,Blackrock Spire,6,64,Edwin VanCleef,the Orb of Command takes you in",
 			"V,1,1,13,0,0,0", "V,101,1,6,0,0,0" })
 	elseif cmd == "A" then
 		list("A", req, args[3] .. ":" .. args[4] .. ":" .. args[5], {
@@ -692,18 +694,27 @@ step("open Deadmines: bosses, rares, overview, lockout and requirements", functi
 	assert(J.view.page == "instance" and J.view.tier == 0, "didn't move to the instance under its tier")
 	assert(textShown("^Edwin VanCleef$") and textShown("^Mr. Smite$"), "boss rows missing")
 	assert(textShown("^Rares$") and textShown("^Miner Johnson$"), "rares section missing")
-	assert(textShown("Difficulties"), "instance overview missing")
+	assert(textShown("Difficulty"), "instance overview missing")
 	assert(textShown("saved, 1/2 defeated"), "lockout not shown: bit 6 is VanCleef")
 	assert(textShown("Carry Unsent Letter"), "requirement missing")
+	assert(textShown("Drops from Edwin VanCleef"), "requirement's source missing")
+	assert(textShown("Optional shortcut: complete the quest Blackhand's Command"), "optional shortcut missing")
+	assert(textShown("Starts from the item Blackhand's Command, which drops from Edwin VanCleef"), "shortcut quest's item missing")
 	assert(textShown("1 to pick up"), "quest summary missing")
 end)
 
-step("entrance on the map", function ()
-	local b = buttonShown("Show on map")
-	assert(b, "no entrance button")
-	b.__scripts.OnClick(b)
-	tick(0.5)
-	assert(sent[#sent]:match("^M:%d+:E:6$"), "entrance flag not asked: " .. sent[#sent])
+step("entrance on the map, requirement pointers", function ()
+	local asked = {}
+	for _, b in ipairs(findAll(function (f)
+		return f.__kind == "Button" and f:IsVisible() and (f.__text == "Show on map" or (rawget(f, "__fs") and f.__fs.__text == "Show on map"))
+	end)) do
+		b.__scripts.OnClick(b)
+		tick(0.5)
+		asked[sent[#sent]:gsub("^M:%d+:", "")] = true
+	end
+	assert(asked["E:6"], "entrance flag not asked")
+	local boss = buttonShown("Show boss")
+	assert(boss, "the requirement's boss can't be opened")
 end)
 
 step("boss: overview, abilities", function ()

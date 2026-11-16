@@ -66,7 +66,7 @@ local function buildInstances(rows)
 			table.insert(list, inst)
 		elseif kind == "W" and byId[r[2]] then
 			table.insert(byId[r[2]].wings, { index = r[3], lfgId = r[4], minLevel = r[5], maxLevel = r[6],
-				name = Unescape(tostring(r[7])) })
+				name = Unescape(tostring(r[7])), targetLevel = tonumber(r[8]) })
 		elseif kind == "V" and byId[r[2]] then
 			table.insert(byId[r[2]].variants, { id = r[3], difficulty = r[4], expansion = r[5], players = r[6],
 				minLevel = r[7], reqState = r[8], label = Unescape(tostring(r[9])) })
@@ -107,8 +107,50 @@ J.On("CACHE_RESET", function ()
 	instances, instanceList = nil, nil
 end)
 
+-- An instance's levels on a tier's tab: its own, or for a tab of another expansion (40 player
+-- Onyxia and Naxxramas with the classic raids) that expansion's top level, as its raids have. The
+-- best level is a dungeon's, "~32-40" across its wings when they differ.
+local TOP_LEVEL = { [0] = 60, [1] = 70, [2] = 80 }
+function J.InstanceLevels(inst, tier)
+	if tier and inst.expansion ~= tier and TOP_LEVEL[tier] then
+		return TOP_LEVEL[tier], TOP_LEVEL[tier], nil
+	end
+	if inst.raid or not inst.targetLevel or inst.targetLevel == 0 then return inst.minLevel, inst.maxLevel, nil end
+	local lo, hi = inst.targetLevel, inst.targetLevel
+	for _, w in ipairs(inst.wings) do
+		if (w.targetLevel or 0) > 0 then lo, hi = math.min(lo, w.targetLevel), math.max(hi, w.targetLevel) end
+	end
+	return inst.minLevel, inst.maxLevel, lo == hi and ("~" .. lo) or ("~" .. lo .. "-" .. hi)
+end
+
+-- "Level 29-45, best ~32-40"
+function J.LevelText(inst, tier)
+	local minLevel, maxLevel, best = J.InstanceLevels(inst, tier)
+	local text = minLevel == maxLevel and ("Level " .. minLevel) or ("Level " .. minLevel .. "-" .. maxLevel)
+	if best then text = text .. ", best " .. best end
+	return text
+end
+
 -- The tab of an instance to show for a tier: the one the era has opened, the later one when
 -- several are open (25 player over 10), else the first.
+-- An instance's quests for a tier's tab: in an instance with tabs in more than one expansion
+-- (Onyxia, Naxxramas), the quests of that expansion's levels (up to 60, 61-70, 71-80).
+function J.QuestsForTier(inst, tier, quests)
+	if not quests or tier == nil then return quests end
+	local mixed = false
+	for _, v in ipairs(inst.variants) do
+		if v.expansion ~= inst.expansion then mixed = true end
+	end
+	if not mixed then return quests end
+	local out = {}
+	for _, q in ipairs(quests) do
+		local level = tonumber(q.level) or 0
+		local band = level > 70 and 2 or level > 60 and 1 or 0
+		if level <= 0 or band == tier then table.insert(out, q) end
+	end
+	return out
+end
+
 function J.VariantsFor(inst, tier)
 	local out = {}
 	for _, v in ipairs(inst.variants) do
@@ -189,7 +231,13 @@ function J.LoadStatus(inst, done, force)
 					at = GetTime() }
 			elseif r[1] == "R" then
 				out.requirements[r[2]] = out.requirements[r[2]] or {}
-				table.insert(out.requirements[r[2]], { kind = r[3], id = r[4], have = r[5] == 1, name = Unescape(tostring(r[6] or "-")) })
+				local function str(v) return Unescape(tostring(v or "-")) end
+				-- What it is, and where to get it (see Index::HandleStatus): source G giver, Q quest
+				-- reward, D drop, V vendor, B boss.
+				table.insert(out.requirements[r[2]], { kind = r[3], id = r[4], have = r[5] == 1, name = str(r[6]),
+					optional = r[7] == 1, source = tostring(r[8] or "-"), sourceId = tonumber(r[9]) or 0,
+					sourceName = str(r[10]), where = str(r[11]), inst = tonumber(r[12]) or 0, boss = tonumber(r[13]) or 0,
+					text = str(r[14]), note = str(r[15]) })
 			end
 		end
 		return out
