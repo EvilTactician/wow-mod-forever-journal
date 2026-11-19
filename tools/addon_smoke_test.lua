@@ -1313,8 +1313,25 @@ step("quests tab: headings, where you are, chains, era, search, filters", functi
 	tick(0.5)
 end)
 
+step("Journal.InstanceLevels for other addons", function ()
+	assert(Journal.API == 3, "Journal.API not bumped")
+	local called = 0
+	Journal.OnInstanceLevels(function () called = called + 1 end)
+	J.Fire("INSTANCES_LOADED")
+	assert(called == 1, "OnInstanceLevels not called")
+	local found
+	J.LoadInstances(function (byId, list)
+		for _, inst in ipairs(list or {}) do
+			if (inst.lfgId or 0) > 0 then found = inst break end
+		end
+	end)
+	assert(found, "no instance with a Dungeon Finder id")
+	local versions = Journal.InstanceLevels(found.lfgId)
+	assert(versions and versions[1] and versions[1].minLevel == J.TierLevels(found), "levels not given")
+	assert(Journal.InstanceLevels(424242) == nil, "an unknown id gave levels")
+end)
+
 step("quests: Journal.OpenQuest, chain starts", function ()
-	assert(Journal.API == 2, "Journal.API not bumped")
 	local results = {}
 	assert(Journal.OpenQuest(424242, function (ok) table.insert(results, ok) end) == true, "OpenQuest didn't ask the realm")
 	tick(0.5)
