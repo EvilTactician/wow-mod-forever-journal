@@ -1,10 +1,10 @@
-# Journal 2.11.1
+# Journal 2.12.0
 
 <div align="center">
 
 ![Interface Version](https://img.shields.io/badge/Interface-30300-blue)
 ![WoW Version](https://img.shields.io/badge/WoW-3.3.5a-orange)
-[![Version](https://img.shields.io/badge/Version-2.11.1-green)](https://github.com/EvilTactician/wow-mod-forever-journal)
+[![Version](https://img.shields.io/badge/Version-2.12.0-green)](https://github.com/EvilTactician/wow-mod-forever-journal)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
 </div>
@@ -575,7 +575,7 @@ end
 ```
 
 `panel` fills the window's content area (about 870 by 530). `Journal.API` is the version of this
-interface (2). `Journal.IsTabShown(key)` tells whether the journal is open on a tab.
+interface (3). `Journal.IsTabShown(key)` tells whether the journal is open on a tab.
 
 From `Journal.API` 2, `Journal.OpenQuest(questId, done)` opens the Quests tab on a quest: its
 heading picked, the quest scrolled to, opened and marked, whatever the filters (one the character
@@ -590,6 +590,26 @@ if (Journal.API or 0) >= 2 and Journal.OpenQuest(questId, function (shown)
     if not shown then showStartOnMap() end   -- not in the Quests tab
 end) then return end
 showStartOnMap()                             -- the realm can't open quests
+```
+
+From `Journal.API` 3, `Journal.InstanceLevels(lfgId)` gives an instance's levels as the journal
+shows them (worked out from the realm's bosses, see the Dungeons tab), by the Dungeon Finder id of
+the instance or of one of its wings; `nil` while unknown (asking starts loading the list). One entry
+per expansion it has tabs in, oldest first (40 player Onyxia at 60, then the Wrath one at 80):
+
+```lua
+{ expansion = 0, raid = false, minLevel = 29, maxLevel = 45, best = "~32-40", players = 5,
+  wings = { { name = "Graveyard", minLevel = 29, maxLevel = 37, best = "~32" }, ... } }
+```
+
+`best` is `nil` for raids, which have one level (`minLevel == maxLevel`). `Journal.OnInstanceLevels(callback)`
+calls `callback()` each time the list is loaded or reloaded, so a map can redraw its pins:
+
+```lua
+if Journal and (Journal.API or 0) >= 3 then
+    Journal.OnInstanceLevels(RefreshEntrancePins)
+    local versions = Journal.InstanceLevels(lfgId)   -- nil: use your own levels for now
+end
 ```
 
 ## Commands
