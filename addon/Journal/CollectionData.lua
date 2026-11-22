@@ -374,9 +374,12 @@ function J.FilteredEntries(kind, catalog, text)
 				for b in pairs(f.sources) do if band(e.sources, b) ~= 0 then hit = true break end end
 				ok = hit
 			end
-			if ok and text and not (name or ""):lower():find(text, 1, true) then ok = false end
+			-- A pet's own name (mod-companion-auras) is searched too, and is what it's listed by.
+			local custom = kind == "pets" and J.CompanionCustomName and J.CompanionCustomName(e)
+			if ok and text and not (name or ""):lower():find(text, 1, true)
+				and not (custom and custom:lower():find(text, 1, true)) then ok = false end
 			if ok then
-				e.sortName = (name or ("item " .. e.id)):lower()
+				e.sortName = (custom or name or ("item " .. e.id)):lower()
 				e.mine = mine
 				table.insert(out, e)
 			end
@@ -431,6 +434,9 @@ local function buildSources(rows)
 			s.area, s.chance, s.reqState, s.name = r[3], r[4], r[5], Unescape(tostring(r[6]))
 		elseif kind == "I" then
 			s.item, s.chance = r[3], r[4]
+		elseif kind == "R" then
+			-- mod-companion-auras' world drop: 1 in this many kills of any creature (0: a loot table).
+			s.oneIn = tonumber(r[3]) or 0
 		elseif kind == "Q" then
 			s.quest, s.level, s.reqState, s.placed, s.faction = r[3], r[4], r[5], r[6] == 1, r[7]
 			s.name, s.giver, s.where = Unescape(tostring(r[8])), Unescape(tostring(r[9] or "-")), Unescape(tostring(r[10] or "-"))

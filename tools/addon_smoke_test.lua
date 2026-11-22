@@ -337,6 +337,12 @@ local spellNames = { [5145] = "Arcane Explosion", [6432] = "Smite Stomp", [9999]
 	[470] = "Black Stallion", [458] = "Brown Horse", [32244] = "Blue Wind Rider", [10673] = "Bombay Cat", [10674] = "Cornish Rex Cat",
 	[27241] = "Gurky", [90615] = "Twilight Witch's Sweeper" }
 function GetSpellInfo(id) return spellNames[id], nil, "Interface\\Icons\\S" end
+StaticPopupDialogs = {}
+local popup
+function StaticPopup_Show(which, a1, a2, data) popup = { which = which, data = data } end
+ACCEPT, CANCEL = "Accept", "Cancel"
+UIErrorsFrame = { messages = {} }
+function UIErrorsFrame:AddMessage(text) table.insert(self.messages, text) end
 function GetSpellLink(id) return "|Hspell:" .. id .. "|h[" .. tostring(spellNames[id]) .. "]|h" end
 
 -----------------------------------------
@@ -345,11 +351,17 @@ function GetSpellLink(id) return "|Hspell:" .. id .. "|h[" .. tostring(spellName
 local outbox = {}
 -- mod-pet-loot's auto-summon pick: the Pets tab asks it under its own prefix.
 local petLoot = { outbox = {}, sent = {}, pick = 0, online = true }
+-- mod-companion-auras: what the journal asked (the test answers by hand).
+local compAuras = { sent = {} }
 function SendAddonMessage(prefix, msg, channel)
 	assert(channel == "WHISPER", "bad addon message")
 	assert(#prefix + 1 + #msg <= 254, "addon message too long")
 	if prefix == "PETLOOT" then
 		table.insert(petLoot.outbox, msg)
+		return
+	end
+	if prefix == "CompAuras" then
+		table.insert(compAuras.sent, msg)
 		return
 	end
 	assert(prefix == "JNL", "bad addon message prefix: " .. tostring(prefix))
@@ -1238,6 +1250,37 @@ step("pets and toys tabs", function ()
 	J.Fire("COMPANIONS")
 	tick(1)
 	assert(not textShown("^Gurky$"), "a pet the character no longer has is still listed")
+
+	-- mod-companion-auras: the Pets tab asked for the list; the realm answers with auras and names.
+	local asked = false
+	for _, m in ipairs(compAuras.sent) do if m == "SYNC" then asked = true end end
+	assert(asked, "the Pets tab didn't ask mod-companion-auras for its list")
+	local autoBefore = J.autoSummon
+	spellNames[90001] = "Companion: Feline"
+	fire("CHAT_MSG_ADDON", "CompAuras", "SYNC", "WHISPER", "Tester")   -- our own request echoed: ignored
+	fire("CHAT_MSG_ADDON", "CompAuras", "A|7385,90001,1;7384,90001,0", "WHISPER", "Tester")
+	fire("CHAT_MSG_ADDON", "CompAuras", "N|7385|Whiskers", "WHISPER", "Tester")
+	fire("CHAT_MSG_ADDON", "CompAuras", "E|", "WHISPER", "Tester")
+	tick(0.5)
+	local named = find(function (f) return f.__kind == "Button" and type(rawget(f, "entry")) == "table" and f.entry.id == 10673 and f:IsVisible() end)
+	named.__scripts.OnClick(named)
+	tick(0.5)
+	assert(textShown("^Whiskers$"), "the pet's own name isn't shown")
+	assert(textShown("Bombay Cat"), "the pet's normal name isn't shown with its own name")
+	assert(textShown("Companion: Feline") and textShown("Rare"), "the pet's aura isn't shown")
+	assert(buttonShown("Rename") and buttonShown("Reset name"), "no Rename / Reset name for a collected pet")
+	local renameButton = buttonShown("Rename")
+	renameButton.__scripts.OnClick(renameButton)
+	assert(popup and popup.which == "JOURNAL_RENAME_COMPANION" and popup.data.id == 10673, "Rename didn't open the name box")
+	local resetButton = buttonShown("Reset name")
+	resetButton.__scripts.OnClick(resetButton)
+	assert(compAuras.sent[#compAuras.sent] == "NAME|7385", "Reset name didn't ask for the normal name back")
+	fire("CHAT_MSG_ADDON", "CompAuras", "R|7385", "WHISPER", "Tester")
+	tick(0.5)
+	assert(not textShown("^Whiskers$") and not buttonShown("Reset name"), "the name wasn't reset")
+	fire("CHAT_MSG_ADDON", "CompAuras", "F|7385", "WHISPER", "Tester")
+	assert(UIErrorsFrame.messages[#UIErrorsFrame.messages] == "That name isn't allowed.", "a refused name wasn't said")
+	assert(J.autoSummon == autoBefore, "mod-companion-auras' answers changed the Auto-summon box")
 	J.OpenSection("toys")
 	tick(1)
 	assert(counts.O and counts.O >= 1, "owned toys not asked")
