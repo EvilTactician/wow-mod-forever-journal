@@ -1020,7 +1020,8 @@ local function buildTab(kind, panel)
 		subtitle:SetText(table.concat(bits, " - "))
 		if auraLine then
 			local spell, rare = J.CompanionAura(e)
-			local spellName, _, spellIcon = spell and GetSpellInfo(spell)
+			local spellName, spellIcon
+			if spell then spellName, _, spellIcon = GetSpellInfo(spell) end
 			if spellName then
 				local desc = J.SpellDescription(spell)
 				auraLine.spell, auraLine.rare = spell, rare

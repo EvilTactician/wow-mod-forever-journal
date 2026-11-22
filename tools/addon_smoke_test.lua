@@ -521,6 +521,7 @@ local function serve(msg)
 			"D,1,30639,150,6,6,0,1,0,Edwin VanCleef,The Deadmines,0,-,639",
 			"D,8,15954,100,159,3,0,1,0,Noth the Plaguebringer,Naxxramas,101,40 Player",
 			"Q,2,166,22,9,1,1,The Defias Brotherhood,Gryan Stoutmantle,Westfall",
+			"Q,2,9166,22,9,1,2,The Defias Brotherhood,Horde Giver,Orgrimmar", -- the Horde's version: one line
 			"A,3,1234", "C,4,9999,202,250,Engineering,0,0,0", "T,5,2,20,0,0,1,12,Lord Grayson,Stormwind City",
 			"N,6,Ask a GM%2C nicely.", "S,7,222,180,0", "B,8,5,60000000,0,1,Mister Chu,Booty Bay,Landro Longshot",
 			"U,9,20,7,10000000,1,0,1,4,Mirabel Ashford,Stormwind City", "+,10,V,3",
@@ -933,6 +934,10 @@ step("mount sources: cost, boss link, quest, achievement, trainer, note, more", 
 	assert(textShown("40 Player"), "the difficulty a boss drops it on is missing")
 	assert(textShown("from a trainer"), "where a crafted one's recipe comes from is missing")
 	assert(textShown("Quest: The Defias Brotherhood"), "quest source missing")
+	local questLines = findAll(function (f) return f.__kind == "FontString" and f.__text == "Quest: The Defias Brotherhood" and f:IsVisible() end)
+	assert(#questLines == 1, "a quest's versions are listed apart: " .. #questLines)
+	assert(textShown("from Gryan Stoutmantle") and not textShown("Horde Giver"), "not the character's faction's version")
+	assert(textShown("^from Gryan Stoutmantle, Westfall, level 22 %- "), "a quest both factions have is marked with one")
 	assert(textShown("Achievement: Leeroy!"), "achievement source missing")
 	assert(textShown("Trainer: Paladin trainers") or textShown("Trainer: "), "trainer source missing")
 	assert(textShown("Ask a GM, nicely."), "note missing")

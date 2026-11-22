@@ -468,13 +468,44 @@ local function buildSources(rows)
 end
 
 -- Calls done(sources) with the entry's sources, in the server's order.
+-- One quest with a version per race or faction (Luci's "Welcome!") is one line: the version this
+-- character's faction can take (its giver and map flag), with no faction named when both have one.
+local function mergeQuestVersions(list)
+	local mine = UnitFactionGroup("player") == "Horde" and 2 or 1
+	local out, at = {}, {}
+	for _, s in ipairs(list) do
+		local key = s.kind == "Q" and (tostring(s.name) .. "|" .. tostring(s.level))
+		local i = key and at[key]
+		if not i then
+			if key then
+				at[key] = #out + 1
+				s.factions = { [s.faction or 0] = true }
+			end
+			table.insert(out, s)
+		else
+			local first = out[i]
+			first.factions[s.faction or 0] = true
+			if s.faction == mine and first.faction ~= mine then
+				s.factions = first.factions
+				out[i] = s
+			end
+		end
+	end
+	for _, s in ipairs(out) do
+		local f = s.factions
+		if f and (f[0] or (f[1] and f[2])) then s.faction = 0 end
+		if s.kind == "Q" then s.factions = nil end
+	end
+	return out
+end
+
 function J.LoadSources(kind, e, done)
 	-- One the catalog left out has nothing for the server to tell.
 	if e.extra then done({}) return end
 	local key = kind .. ":" .. e.id
 	if sources[key] then done(sources[key]) return end
 	J.Request("W", { J.KINDS[kind].letter, tostring(e.id) }, function (result)
-		if result then sources[key] = buildSources(result.rows) end
+		if result then sources[key] = mergeQuestVersions(buildSources(result.rows)) end
 		done(sources[key])
 	end)
 end
