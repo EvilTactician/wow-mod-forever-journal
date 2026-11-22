@@ -26,7 +26,10 @@ An [AzerothCore](https://www.azerothcore.org/) (WotLK 3.3.5a) module and addon t
   read in the world, to read again.
 - **Mounts**, **Pets** and **Toys**: everything there is to collect, what you already have, and
   where to get the rest: vendors and their prices, drops with their chances, quests,
-  achievements, professions, trainers, containers and fishing.
+  achievements, professions, trainers, containers and fishing. With
+  [mod-companion-auras](https://github.com/EvilTactician/mod-companion-auras) installed, the Pets tab
+  also shows each companion's **aura**, lets you **rename** your companions, and lists its very
+  rare world drops.
 - Tabs from other addons: [mod-beast-collection](https://github.com/buildthehomelab/wow-mod-beast-collection)'s
   hunter **Beasts** field guide and [mod-transmog-plus](https://github.com/buildthehomelab/wow-mod-transmog-plus)'s
   **Appearances** show up here when they're installed.
