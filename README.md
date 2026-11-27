@@ -36,8 +36,9 @@ An [AzerothCore](https://www.azerothcore.org/) (WotLK 3.3.5a) module and addon t
 - Optional tabs from separate addons:
   - **Progression** ([JournalProgression](https://github.com/EvilTactician/JournalProgression)):
     your mod-individual-progression stage and what it takes to unlock the next.
-  - **Gear** ([JournalGearBIS](https://github.com/EvilTactician/JournalGearBIS)): a best-in-slot
-    gear path for your class and role, aware of your progression stage.
+  - **Gear Guide** ([JournalGearGuide](https://github.com/EvilTactician/JournalGearGuide)): a best-in-slot
+    gear path for your class and role, aware of your progression stage, with an upgrade arrow on
+    items that are upgrades on your list.
 
 Open it with **Shift-J**, the minimap button, `/journal`, `/quests`, `/directory`, `/lore`, `/mounts`,
 `/pets` or `/toys`. With DragonUI, its Pets & Mounts micro button (and its key binding) opens the
